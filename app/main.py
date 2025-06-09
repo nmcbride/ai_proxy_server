@@ -106,6 +106,21 @@ async def health_check() -> dict:
     return {"status": "healthy", "timestamp": time.time()}
 
 
+@app.api_route("/config", methods=["GET"])
+async def get_config() -> dict:
+    """Get current server configuration"""
+    return {
+        "ENABLE_HYBRID_STREAMING": settings.ENABLE_HYBRID_STREAMING,
+        "ENABLE_REQUEST_MODIFICATION": settings.ENABLE_REQUEST_MODIFICATION,
+        "ENABLE_RESPONSE_MODIFICATION": settings.ENABLE_RESPONSE_MODIFICATION,
+        "MAX_TOOL_ROUNDS": settings.MAX_TOOL_ROUNDS,
+        "TOOL_EXECUTION_TIMEOUT": settings.TOOL_EXECUTION_TIMEOUT,
+        "REQUEST_TIMEOUT": settings.REQUEST_TIMEOUT,
+        "LITELLM_BASE_URL": settings.LITELLM_BASE_URL,
+        "SYSTEM_CONTEXT": settings.SYSTEM_CONTEXT[:100] + "..." if settings.SYSTEM_CONTEXT and len(settings.SYSTEM_CONTEXT) > 100 else settings.SYSTEM_CONTEXT,
+    }
+
+
 @app.api_route("/mcp/status", methods=["GET"])
 async def mcp_status() -> dict:
     """Get MCP server status and available tools"""

@@ -1,17 +1,17 @@
 mcp_servers:
-  # Example weather server (working demo server)
-  weather:
-    transport: stdio
-    command: uv
-    args: ["run", "python", "examples/weather_server.py"]
-    description: "Weather information and forecasts"
-  
-  # Debug server for testing tool calls
+  # Debug server for testing tool calls (only server enabled for testing)
   debug:
     transport: stdio
     command: uv
     args: ["run", "python", "mcp_servers/debug_server.py"]
     description: "Debug tools for testing MCP integration"
+  
+  # Example weather server (disabled for testing)
+  # weather:
+  #   transport: stdio
+  #   command: uv
+  #   args: ["run", "python", "examples/weather_server.py"]
+  #   description: "Weather information and forecasts"
   
   # Example Node.js MCP server (if you have one)
   # nodejs_example:
@@ -43,11 +43,11 @@ mcp_servers:
   #     token: "your_token_here"
   #   description: "External API integration"
   
-  # Context7 online MCP server (enabled for testing)
-  context7:
-    transport: http
-    server_url: "https://mcp.context7.com/mcp"
-    description: "Context7 online documentation server"
+  # Context7 online MCP server (disabled for testing)
+  # context7:
+  #   transport: http
+  #   server_url: "https://mcp.context7.com/mcp"
+  #   description: "Context7 online documentation server"
 
   # Example: Context7 local MCP server (if you want to run it locally)
   # context7_local:

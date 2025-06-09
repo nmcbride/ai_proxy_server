@@ -68,13 +68,13 @@ class Settings(BaseSettings):
 
     # Tool calling configuration
     MAX_TOOL_ROUNDS: int = Field(
-        default=5, 
+        default=5,
         validation_alias="MAX_TOOL_ROUNDS",
         description="Maximum number of tool calling rounds to prevent infinite loops"
     )
     TOOL_EXECUTION_TIMEOUT: float = Field(
         default=30.0,
-        validation_alias="TOOL_EXECUTION_TIMEOUT", 
+        validation_alias="TOOL_EXECUTION_TIMEOUT",
         description="Timeout for individual tool execution in seconds"
     )
     ENABLE_HYBRID_STREAMING: bool = Field(
