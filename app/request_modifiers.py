@@ -21,7 +21,7 @@ class RequestModifier:
         self.logger = logger.bind(component="request_modifier")
 
     async def modify_request(
-        self, path: str, request_data: Dict[str, Any], request: Request
+        self, path: str, request_data: Dict[str, Any], request: Request, is_streaming: bool = False
     ) -> Dict[str, Any]:
         """
         Main method to modify requests based on the endpoint path
@@ -30,6 +30,7 @@ class RequestModifier:
             path: The API endpoint path (e.g., "/v1/chat/completions")
             request_data: The parsed request JSON data
             request: The FastAPI Request object
+            is_streaming: Whether this is a streaming request (no tool calling possible)
 
         Returns:
             Modified request data
@@ -41,24 +42,27 @@ class RequestModifier:
 
         # Route to specific modifier based on endpoint
         if path == "/v1/chat/completions":
-            return await self._modify_chat_completion(request_data, request)
+            return await self._modify_chat_completion(request_data, request, is_streaming)
         elif path == "/v1/completions":
-            return await self._modify_completion(request_data, request)
+            return await self._modify_completion(request_data, request, is_streaming)
         elif path == "/v1/embeddings":
-            return await self._modify_embedding(request_data, request)
+            return await self._modify_embedding(request_data, request, is_streaming)
         else:
-            return await self._modify_generic(request_data, request)
+            return await self._modify_generic(request_data, request, is_streaming)
 
     async def _modify_chat_completion(
-        self, request_data: Dict[str, Any], request: Request
+        self, request_data: Dict[str, Any], request: Request, is_streaming: bool = False
     ) -> Dict[str, Any]:
         """
         Modify chat completion requests
         Example: Add system context, modify user messages, etc.
         """
-        # Add MCP tools if available
-        if "messages" in request_data:
+        # Add MCP tools if available and not streaming (tool calling only works for non-streaming)
+        if "messages" in request_data and not is_streaming:
             await self._add_mcp_tools(request_data)
+            self.logger.info("Added MCP tools to non-streaming request")
+        elif is_streaming:
+            self.logger.info("Skipping MCP tools for streaming request")
 
         # Add system context if configured
         if settings.SYSTEM_CONTEXT and "messages" in request_data:
@@ -112,7 +116,7 @@ class RequestModifier:
         return request_data
 
     async def _modify_completion(
-        self, request_data: Dict[str, Any], request: Request
+        self, request_data: Dict[str, Any], request: Request, is_streaming: bool = False
     ) -> Dict[str, Any]:
         """
         Modify text completion requests
@@ -148,7 +152,7 @@ class RequestModifier:
         return request_data
 
     async def _modify_embedding(
-        self, request_data: Dict[str, Any], request: Request
+        self, request_data: Dict[str, Any], request: Request, is_streaming: bool = False
     ) -> Dict[str, Any]:
         """
         Modify embedding requests
@@ -180,7 +184,7 @@ class RequestModifier:
         return request_data
 
     async def _modify_generic(
-        self, request_data: Dict[str, Any], request: Request
+        self, request_data: Dict[str, Any], request: Request, is_streaming: bool = False
     ) -> Dict[str, Any]:
         """
         Generic request modification for other endpoints
@@ -304,11 +308,11 @@ class AdvancedRequestModifier(RequestModifier):
         self.content_filters: List[str] = []  # Could be loaded from config
 
     async def _modify_chat_completion(
-        self, request_data: Dict[str, Any], request: Request
+        self, request_data: Dict[str, Any], request: Request, is_streaming: bool = False
     ) -> Dict[str, Any]:
         """Advanced chat completion modification"""
         # Call parent method first
-        request_data = await super()._modify_chat_completion(request_data, request)
+        request_data = await super()._modify_chat_completion(request_data, request, is_streaming)
 
         # Add advanced features
         await self._apply_content_filtering(request_data)
