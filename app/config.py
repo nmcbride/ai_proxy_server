@@ -21,6 +21,7 @@ class Settings(BaseSettings):
         default="http://localhost:4000", validation_alias="LITELLM_BASE_URL"
     )
     LITELLM_API_KEY: str = Field(default="", validation_alias="LITELLM_API_KEY")
+    LITELLM_MASTER_KEY: str = Field(default="", validation_alias="LITELLM_MASTER_KEY")
 
     # HTTP client configuration
     REQUEST_TIMEOUT: float = Field(
@@ -56,8 +57,6 @@ class Settings(BaseSettings):
         validation_alias="SYSTEM_CONTEXT",
         description="Additional system context to inject into chat completions",
     )
-
-
 
     # Rate limiting (optional, not implemented yet)
     ENABLE_RATE_LIMITING: bool = Field(

@@ -59,7 +59,7 @@ class RequestModifier:
         # Add MCP tools if available
         if "messages" in request_data:
             await self._add_mcp_tools(request_data)
-        
+
         # Add system context if configured
         if settings.SYSTEM_CONTEXT and "messages" in request_data:
             messages = request_data["messages"]
@@ -202,50 +202,54 @@ class RequestModifier:
         try:
             # Get available MCP tools
             mcp_tools = mcp_manager.format_tools_for_ai()
-            
+
             if mcp_tools:
                 # Add tools to request
                 request_data["tools"] = request_data.get("tools", []) + mcp_tools
-                
+
                 # Ensure tool_choice allows auto selection
                 if "tool_choice" not in request_data:
                     request_data["tool_choice"] = "auto"
-                
-                self.logger.info("Added MCP tools to request", tool_count=len(mcp_tools))
-                
+
+                self.logger.info(
+                    "Added MCP tools to request", tool_count=len(mcp_tools)
+                )
+
                 # Add information about available tools to system message
                 tool_descriptions = []
                 for tool in mcp_tools:
                     func = tool["function"]
                     tool_descriptions.append(f"- {func['name']}: {func['description']}")
-                
+
                 if tool_descriptions and "messages" in request_data:
                     messages = request_data["messages"]
-                    
+
                     # Create or update system message with tool info
                     tool_info = (
-                        "You have access to the following tools:\n" + 
-                        "\n".join(tool_descriptions) +
-                        "\n\nYou can call these tools when needed to help the user."
+                        "You have access to the following tools:\n"
+                        + "\n".join(tool_descriptions)
+                        + "\n\nYou can call these tools when needed to help the user."
                     )
-                    
+
                     # Find existing system message or create new one
                     system_msg_index = None
                     for i, msg in enumerate(messages):
                         if msg.get("role") == "system":
                             system_msg_index = i
                             break
-                    
+
                     if system_msg_index is not None:
                         # Append to existing system message
                         existing_content = messages[system_msg_index].get("content", "")
-                        messages[system_msg_index]["content"] = f"{existing_content}\n\n{tool_info}"
+                        messages[system_msg_index][
+                            "content"
+                        ] = f"{existing_content}\n\n{tool_info}"
                     else:
                         # Add new system message at the beginning
                         messages.insert(0, {"role": "system", "content": tool_info})
-                    
+
                     self.logger.info("Added tool information to system message")
-        
+
         except Exception as e:
             self.logger.error("Failed to add MCP tools to request", error=str(e))
 

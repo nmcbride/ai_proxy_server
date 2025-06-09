@@ -10,7 +10,6 @@ import structlog
 from fastapi import Request
 
 from app.config import settings
-from app.mcp_client import mcp_manager
 
 logger = structlog.get_logger()
 

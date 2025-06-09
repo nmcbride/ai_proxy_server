@@ -11,53 +11,38 @@ curl -X POST "http://localhost:8000/v1/chat/completions" \
 -H "Authorization: Bearer test-key" \
 -d '{
 "model": "gpt-3.5-turbo",
-"messages": [{"role": "user", "content": "Write exactly 3 sentences about robots."}],
+"messages": [{"role": "user", "content": "Say hello in exactly 5 words."}],
 "stream": false,
-"max_tokens": 100
+"max_tokens": 20
 }' \
---no-buffer \
--w "\n📊 Non-streaming - Total time: %{time_total}s, Time to first byte: %{time_starttransfer}s\n" \
--s | jq -r '.choices[0].message.content' 2>/dev/null || cat
+--max-time 10 \
+-w "\n📊 Non-streaming - Total time: %{time_total}s\n"
 
 echo -e "\n================================================"
 
 echo "2️⃣ Testing STREAMING response (through proxy)..."
 echo "Starting streaming at: $(date '+%H:%M:%S.%3N')"
 
+echo "📡 Showing first 8 lines of streaming response:"
 curl -X POST "http://localhost:8000/v1/chat/completions" \
 -H "Content-Type: application/json" \
 -H "Authorization: Bearer test-key" \
 -d '{
 "model": "gpt-3.5-turbo", 
-"messages": [{"role": "user", "content": "Write exactly 3 sentences about robots."}],
+"messages": [{"role": "user", "content": "Say hello in exactly 5 words."}],
 "stream": true,
-"max_tokens": 100
+"max_tokens": 20
 }' \
 --no-buffer \
--w "\n📊 Streaming - Total time: %{time_total}s, Time to first byte: %{time_starttransfer}s\n" | \
-while IFS= read -r line; do
-    if [[ $line == data:* ]]; then
-        # Parse SSE data line and extract content
-        json_part=$(echo "$line" | sed 's/^data: //')
-        if [[ $json_part != "[DONE]" ]]; then
-            content=$(echo "$json_part" | jq -r '.choices[0].delta.content // empty' 2>/dev/null)
-            if [[ -n "$content" && "$content" != "null" ]]; then
-                echo -n "$content"
-            fi
-        fi
-    else
-        # Non-data lines (timing info, etc.)
-        if [[ $line == *"Total time"* ]]; then
-            echo -e "\n$line"
-        fi
-    fi
-done
+--max-time 10 | head -8
+
+echo -e "\n✅ Streaming test completed (showing first 8 chunks)"
 
 echo -e "\n================================================"
 echo "🎯 Comparison completed!"
 echo ""
-echo "🧠 Key Differences:"
-echo "   • Non-streaming: Single response after full generation"
-echo "   • Streaming: Multiple chunks allowing real-time processing"
-echo "   • Both should have similar total times"
-echo "   • Streaming enables progressive UI updates" 
+echo "🧠 Key Observations:"
+echo "   • Non-streaming: Single JSON response with complete message"
+echo "   • Streaming: Multiple SSE chunks with 'data:' prefix"
+echo "   • Both should complete without hanging"
+echo "   • Streaming enables real-time progressive display" 
