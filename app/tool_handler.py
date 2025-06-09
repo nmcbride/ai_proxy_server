@@ -4,11 +4,13 @@ Tool calling handler for MCP integration
 
 import json
 from typing import Any, Dict
+import asyncio
 
 import httpx
 import structlog
 
 from app.mcp_client import mcp_manager
+from app.config import settings
 
 logger = structlog.get_logger()
 
@@ -27,7 +29,7 @@ async def handle_tool_calls(
     """
     messages = original_request.get("messages", []).copy()
     current_response = initial_response
-    max_tool_rounds = 5  # Prevent infinite loops
+    max_tool_rounds = settings.MAX_TOOL_ROUNDS
     tool_round = 0
 
     while tool_round < max_tool_rounds:
@@ -81,8 +83,11 @@ async def handle_tool_calls(
                         arguments=list(arguments.keys()),
                     )
 
-                    # Call the MCP tool
-                    result = await mcp_manager.call_tool(function_name, arguments)
+                    # Call the MCP tool with timeout
+                    result = await asyncio.wait_for(
+                        mcp_manager.call_tool(function_name, arguments),
+                        timeout=settings.TOOL_EXECUTION_TIMEOUT
+                    )
 
                     # Format result as string (MCP returns content objects)
                     if isinstance(result, list) and result:
@@ -111,6 +116,24 @@ async def handle_tool_calls(
                         proxy_request_id=proxy_request_id,
                         round=tool_round,
                         tool=function_name,
+                    )
+
+                except asyncio.TimeoutError:
+                    logger.error(
+                        "MCP tool execution timeout",
+                        proxy_request_id=proxy_request_id,
+                        round=tool_round,
+                        tool=function_name,
+                        timeout=settings.TOOL_EXECUTION_TIMEOUT,
+                    )
+
+                    # Add timeout error result
+                    tool_results.append(
+                        {
+                            "role": "tool",
+                            "tool_call_id": tool_call_id,
+                            "content": f"Tool {function_name} execution timed out after {settings.TOOL_EXECUTION_TIMEOUT} seconds",
+                        }
                     )
 
                 except Exception as e:
@@ -169,7 +192,7 @@ async def handle_tool_calls(
         logger.warning(
             "Max tool rounds reached, stopping",
             proxy_request_id=proxy_request_id,
-            max_rounds=max_tool_rounds,
+            max_rounds=settings.MAX_TOOL_ROUNDS,
         )
 
     logger.info(

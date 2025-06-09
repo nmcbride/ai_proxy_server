@@ -6,6 +6,13 @@ mcp_servers:
     args: ["run", "python", "examples/weather_server.py"]
     description: "Weather information and forecasts"
   
+  # Debug server for testing tool calls
+  debug:
+    transport: stdio
+    command: uv
+    args: ["run", "python", "mcp_servers/debug_server.py"]
+    description: "Debug tools for testing MCP integration"
+  
   # Example Node.js MCP server (if you have one)
   # nodejs_example:
   #   transport: stdio

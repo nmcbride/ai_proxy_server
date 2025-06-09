@@ -66,6 +66,23 @@ class Settings(BaseSettings):
         default=60, validation_alias="RATE_LIMIT_REQUESTS_PER_MINUTE"
     )
 
+    # Tool calling configuration
+    MAX_TOOL_ROUNDS: int = Field(
+        default=5, 
+        validation_alias="MAX_TOOL_ROUNDS",
+        description="Maximum number of tool calling rounds to prevent infinite loops"
+    )
+    TOOL_EXECUTION_TIMEOUT: float = Field(
+        default=30.0,
+        validation_alias="TOOL_EXECUTION_TIMEOUT", 
+        description="Timeout for individual tool execution in seconds"
+    )
+    ENABLE_HYBRID_STREAMING: bool = Field(
+        default=False,
+        validation_alias="ENABLE_HYBRID_STREAMING",
+        description="Enable hybrid streaming mode (tool calling + streaming final response)"
+    )
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
