@@ -1,0 +1,74 @@
+version: '3.8'
+
+services:
+  # LiteLLM Proxy Server (upstream)
+  litellm:
+    image: ghcr.io/berriai/litellm:main-latest
+    container_name: litellm-server
+    restart: unless-stopped
+    command:
+      - "--config=/litellm_config.yaml"
+      - "--detailed_debug"
+      - "--port=4000"
+      - "--host=0.0.0.0"
+    environment:
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      # ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      # AZURE_API_KEY: ${AZURE_API_KEY:-}
+      # AZURE_API_BASE: ${AZURE_API_BASE:-}
+      # GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
+      # COHERE_API_KEY: ${COHERE_API_KEY:-}
+    volumes:
+      - ./litellm_config.yaml:/litellm_config.yaml:ro,Z
+    ports:
+      - "4000:4000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # AI Proxy Server (our FastAPI proxy)
+  # ai-proxy:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile
+  #   container_name: ai-proxy-server
+  #   ports:
+  #     - "8000:8000"
+  #   env_file:
+  #     - .env
+  #   environment:
+  #     - HOST=0.0.0.0
+  #     - PORT=8000
+  #     - DEBUG=false
+  #     - LITELLM_BASE_URL=http://litellm:4000
+  #     - LITELLM_API_KEY=${LITELLM_API_KEY:-}
+  #     - LOG_LEVEL=INFO
+  #     - ENABLE_REQUEST_MODIFICATION=true
+  #     - ENABLE_RESPONSE_MODIFICATION=true
+  #     - SYSTEM_CONTEXT=${SYSTEM_CONTEXT:-You are a helpful AI assistant.}
+  #   depends_on:
+  #     litellm:
+  #       condition: service_healthy
+  #   healthcheck:
+  #     test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 3
+  #   restart: unless-stopped
+
+  # Optional: Redis for caching and rate limiting
+  redis:
+    image: redis:7-alpine
+    container_name: ai-proxy-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+
+volumes:
+  redis_data: 

@@ -1,0 +1,94 @@
+# LiteLLM Proxy Configuration
+# This configures the upstream LiteLLM server with various models
+
+model_list:
+  # OpenAI Models
+  - model_name: gpt-4
+    litellm_params:
+      model: openai/gpt-4
+      api_key: os.environ/OPENAI_API_KEY
+
+  - model_name: gpt-4-turbo
+    litellm_params:
+      model: openai/gpt-4-turbo
+      api_key: os.environ/OPENAI_API_KEY
+
+  - model_name: gpt-3.5-turbo
+    litellm_params:
+      model: openai/gpt-3.5-turbo
+      api_key: os.environ/OPENAI_API_KEY
+
+  - model_name: gpt-3.5-turbo-instruct
+    litellm_params:
+      model: text-completion-openai/gpt-3.5-turbo-instruct
+      api_key: os.environ/OPENAI_API_KEY
+
+  # Embeddings
+  - model_name: text-embedding-ada-002
+    litellm_params:
+      model: openai/text-embedding-ada-002
+      api_key: os.environ/OPENAI_API_KEY
+
+  - model_name: text-embedding-3-small
+    litellm_params:
+      model: openai/text-embedding-3-small
+      api_key: os.environ/OPENAI_API_KEY
+
+  - model_name: text-embedding-3-large
+    litellm_params:
+      model: openai/text-embedding-3-large
+      api_key: os.environ/OPENAI_API_KEY
+
+  # Azure OpenAI (if configured)
+  # - model_name: azure-gpt-4
+  #   litellm_params:
+  #     model: azure/gpt-4
+  #     api_base: os.environ/AZURE_API_BASE
+  #     api_version: "2023-05-15"
+  #     api_key: os.environ/AZURE_API_KEY
+
+  # Anthropic Claude (if configured)
+  # - model_name: claude-3-opus
+  #   litellm_params:
+  #     model: anthropic/claude-3-opus-20240229
+  #     api_key: os.environ/ANTHROPIC_API_KEY
+
+  # - model_name: claude-3-sonnet
+  #   litellm_params:
+  #     model: anthropic/claude-3-sonnet-20240229
+  #     api_key: os.environ/ANTHROPIC_API_KEY
+
+  # Google AI (if configured)
+  # - model_name: gemini-pro
+  #   litellm_params:
+  #     model: gemini/gemini-pro
+  #     api_key: os.environ/GOOGLE_API_KEY
+
+  # Cohere (if configured)
+  # - model_name: cohere-command
+  #   litellm_params:
+  #     model: cohere/command
+  #     api_key: os.environ/COHERE_API_KEY
+
+# General settings
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY  # Optional master key for LiteLLM admin
+  store_model_in_db: false  # Disable database storage
+  use_azure_key_vault: false  # Disable key vault
+
+# Logging
+litellm_settings:
+  # Log level
+  set_verbose: true
+  
+  # Drop params that aren't supported by the model
+  drop_params: true
+  
+  # Callbacks for logging, etc.
+  # callbacks: ["langfuse", "langsmith"]  # Uncomment to enable
+
+# Optional: Load balancing and fallbacks
+# router_settings:
+#   routing_strategy: "simple-shuffle"  # or "least-busy", "latency-based"
+#   allowed_fails: 3
+#   cooldown_time: 30 

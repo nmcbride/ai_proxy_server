@@ -1,0 +1,62 @@
+mcp_servers:
+  # Example weather server (working demo server)
+  weather:
+    transport: stdio
+    command: uv
+    args: ["run", "python", "examples/weather_server.py"]
+    description: "Weather information and forecasts"
+  
+  # Example Node.js MCP server (if you have one)
+  # nodejs_example:
+  #   transport: stdio
+  #   command: npx
+  #   args: ["@modelcontextprotocol/server-filesystem", "/safe/path"]
+  #   description: "Node.js filesystem MCP server"
+  
+  # Example file system server (disabled for testing)
+  # filesystem:
+  #   transport: stdio
+  #   command: mcp-filesystem-server
+  #   args: ["--root", "./safe_directory"]
+  #   description: "Safe file system access"
+  
+  # Example database server (disabled for testing)
+  # database:
+  #   transport: stdio
+  #   command: mcp-sqlite-server
+  #   args: ["--db-path", "data/app.db"]
+  #   description: "Database operations"
+  
+  # Example HTTP-based MCP server (disabled for testing)
+  # external_api:
+  #   transport: http
+  #   server_url: "http://localhost:8080/mcp"
+  #   auth:
+  #     type: bearer
+  #     token: "your_token_here"
+  #   description: "External API integration"
+  
+  # Context7 online MCP server (enabled for testing)
+  context7:
+    transport: http
+    server_url: "https://mcp.context7.com/mcp"
+    description: "Context7 online documentation server"
+
+  # Example: Context7 local MCP server (if you want to run it locally)
+  # context7_local:
+  #   transport: stdio
+  #   command: npx
+  #   args: ["-y", "@upstash/context7-mcp@latest"]
+  #   env:
+  #     DEFAULT_MINIMUM_TOKENS: "15000"  # Force much larger responses to test env var
+  #     NODE_ENV: "development"          # Optional: development mode
+  #   description: "Context7 local documentation server"
+
+# Configuration notes:
+# - stdio transport: Runs a subprocess and communicates via stdin/stdout
+# - http transport: Connects to HTTP-based MCP servers
+# - command: The executable to run for stdio transport
+# - args: Command line arguments
+# - env: Environment variables to set
+# - server_url: URL for HTTP transport
+# - auth: Authentication for HTTP transport 
