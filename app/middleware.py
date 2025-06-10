@@ -95,4 +95,12 @@ class ProxyMiddleware(BaseHTTPMiddleware):
         for header_name, header_value in request.state.proxy_headers.items():
             response.headers[header_name] = header_value
 
+        # Add anti-buffering headers for streaming responses
+        if response.headers.get("content-type", "").startswith("text/event-stream"):
+            response.headers["cache-control"] = "no-cache, no-store, must-revalidate"
+            response.headers["pragma"] = "no-cache"
+            response.headers["expires"] = "0"
+            response.headers["x-accel-buffering"] = "no"  # Nginx
+            response.headers["x-apache-buffering"] = "no"  # Apache
+
         return response

@@ -222,11 +222,15 @@ async def handle_hybrid_streaming_request(
     # Return streaming response
     return StreamingResponse(
         generate_streaming_chunks(),
-        media_type="text/plain",
+        media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
             "X-Accel-Buffering": "no",  # Disable nginx buffering
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Headers": "*",
+            "Access-Control-Allow-Methods": "*",
+            "Access-Control-Allow-Credentials": "true",
         },
     )
 
@@ -338,11 +342,24 @@ async def proxy_request(
                 # Send with streaming enabled
                 upstream_response = await client.send(upstream_request, stream=True)
 
-                # Return pure streaming response preserving upstream headers and status
+                # Return pure streaming response with cleaned headers
+                # Clean headers to avoid conflicts with middleware
+                clean_headers = {}
+                for key, value in upstream_response.headers.items():
+                    # Skip headers that might conflict with middleware
+                    if key.lower() not in ["server", "date"]:
+                        clean_headers[key] = value
+                
+                # Add CORS headers since StreamingResponse bypasses middleware
+                clean_headers["Access-Control-Allow-Origin"] = "*"
+                clean_headers["Access-Control-Allow-Headers"] = "*"
+                clean_headers["Access-Control-Allow-Methods"] = "*"
+                clean_headers["Access-Control-Allow-Credentials"] = "true"
+                
                 return StreamingResponse(
                     upstream_response.aiter_raw(),
                     status_code=upstream_response.status_code,
-                    headers=upstream_response.headers,
+                    headers=clean_headers,
                     background=BackgroundTask(upstream_response.aclose),
                 )
         else:
