@@ -12,7 +12,7 @@ from fastapi import HTTPException, Request, Response
 from fastapi.responses import StreamingResponse
 from starlette.background import BackgroundTask
 
-from app.config import settings
+from configs import settings
 from app.request_modifiers import RequestModifier
 from app.response_modifiers import ResponseModifier
 from app.tool_handler import handle_tool_calls
@@ -23,6 +23,15 @@ logger = structlog.get_logger()
 # Initialize request and response modifiers
 request_modifier = RequestModifier()
 response_modifier = ResponseModifier()
+
+# Import plugin manager from main (will be initialized there)
+plugin_manager = None
+
+
+def set_plugin_manager(pm):
+    """Set the plugin manager instance from main.py"""
+    global plugin_manager
+    plugin_manager = pm
 
 
 async def handle_hybrid_streaming_request(
@@ -48,11 +57,18 @@ async def handle_hybrid_streaming_request(
     non_streaming_request = request_data.copy()
     non_streaming_request["stream"] = False
 
-    # Add MCP tools to the non-streaming request for tool calling
+    # Add MCP tools and apply plugins to the non-streaming request for tool calling
     logger.info(
-        "Adding MCP tools to hybrid streaming request",
+        "Applying request modifications for hybrid streaming request",
         proxy_request_id=proxy_request_id,
     )
+    # Apply plugin system
+    if plugin_manager:
+        context = {"endpoint": path}
+        non_streaming_request = plugin_manager.execute_before_request_plugins(
+            non_streaming_request, context
+        )
+    # Apply core MCP functionality
     non_streaming_request = await request_modifier.modify_request(
         path, non_streaming_request, request, is_streaming=False
     )
@@ -108,11 +124,25 @@ async def handle_hybrid_streaming_request(
             )
         elif modify_response:
             # No tool calls, apply regular response modification
+            # Apply plugin system
+            if plugin_manager:
+                context = {"endpoint": path}
+                response_data = plugin_manager.execute_after_request_plugins(
+                    response_data, context
+                )
+            # Apply core response modification
             response_data = await response_modifier.modify_response(
                 path, response_data, request, upstream_response.status_code
             )
     elif modify_response:
         # Not a chat completion, apply regular response modification
+        # Apply plugin system
+        if plugin_manager:
+            context = {"endpoint": path}
+            response_data = plugin_manager.execute_after_request_plugins(
+                response_data, context
+            )
+        # Apply core response modification
         response_data = await response_modifier.modify_response(
             path, response_data, request, upstream_response.status_code
         )
@@ -237,8 +267,17 @@ async def proxy_request(
                 is_streaming_request = request_data.get("stream", False)
 
                 if modify_request:
+                    # Apply plugin system
+                    if plugin_manager:
+                        context = {"endpoint": path}
+                        modified_data = plugin_manager.execute_before_request_plugins(
+                            request_data, context
+                        )
+                    else:
+                        modified_data = request_data
+                    # Apply core MCP functionality
                     modified_data = await request_modifier.modify_request(
-                        path, request_data, request, is_streaming=is_streaming_request
+                        path, modified_data, request, is_streaming=is_streaming_request
                     )
                     body = json.dumps(modified_data).encode()
             except json.JSONDecodeError:
@@ -360,9 +399,18 @@ async def proxy_request(
                     else:
                         # No tool calls, apply regular response modification
                         if modify_response:
+                            # Apply plugin system
+                            if plugin_manager:
+                                context = {"endpoint": path}
+                                modified_data = plugin_manager.execute_after_request_plugins(
+                                    response_data, context
+                                )
+                            else:
+                                modified_data = response_data
+                            # Apply core response modification
                             modified_data = await response_modifier.modify_response(
                                 path,
-                                response_data,
+                                modified_data,
                                 request,
                                 upstream_response.status_code,
                             )
@@ -372,8 +420,17 @@ async def proxy_request(
                 else:
                     # Not a chat completion, apply regular response modification
                     if modify_response:
+                        # Apply plugin system
+                        if plugin_manager:
+                            context = {"endpoint": path}
+                            modified_data = plugin_manager.execute_after_request_plugins(
+                                response_data, context
+                            )
+                        else:
+                            modified_data = response_data
+                        # Apply core response modification
                         modified_data = await response_modifier.modify_response(
-                            path, response_data, request, upstream_response.status_code
+                            path, modified_data, request, upstream_response.status_code
                         )
                         response_content = json.dumps(modified_data).encode()
                         response_headers.pop("content-length", None)

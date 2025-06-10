@@ -16,7 +16,7 @@ class MCPConfig:
     """Simple MCP server configuration manager"""
 
     def __init__(self, config_path: Path | None = None):
-        self.config_path = config_path or Path("config/mcp_servers.yaml")
+        self.config_path = config_path or Path("configs/mcp_servers.yaml")
         self.servers: Dict[str, Dict[str, Any]] = {}
 
     def load_config(self) -> Dict[str, Dict[str, Any]]:

@@ -12,17 +12,21 @@ from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 
-from app.config import settings
+from configs import settings
 from app.mcp_client import mcp_manager
 from app.mcp_config import mcp_config
 from app.middleware import LoggingMiddleware, ProxyMiddleware
-from app.proxy_handler import proxy_request
+from app.plugin_system import PluginManager
+from app.proxy_handler import proxy_request, set_plugin_manager
 
 # Configure structured logging
 logger = structlog.get_logger()
 
 # Global HTTP client for upstream requests
 http_client: Optional[httpx.AsyncClient] = None
+
+# Global plugin manager
+plugin_manager = PluginManager()
 
 
 
@@ -43,6 +47,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             max_keepalive_connections=settings.MAX_KEEPALIVE_CONNECTIONS,
         ),
     )
+
+    # Initialize plugin system
+    try:
+        counts = plugin_manager.load_plugins()
+        set_plugin_manager(plugin_manager)  # Share with proxy_handler
+        logger.info("Plugin system initialized", counts=counts)
+    except Exception as e:
+        logger.error("Failed to initialize plugin system", error=str(e))
 
     # Initialize MCP connections
     try:
@@ -143,6 +155,16 @@ async def mcp_status() -> dict:
         }
     except Exception as e:
         logger.error("Error getting MCP status", error=str(e))
+        return {"error": str(e)}
+
+
+@app.api_route("/plugins/status", methods=["GET"])
+async def plugin_status() -> dict:
+    """Get plugin status and information"""
+    try:
+        return plugin_manager.get_plugin_status()
+    except Exception as e:
+        logger.error("Error getting plugin status", error=str(e))
         return {"error": str(e)}
 
 

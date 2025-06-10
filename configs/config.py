@@ -58,14 +58,6 @@ class Settings(BaseSettings):
         description="Additional system context to inject into chat completions",
     )
 
-    # Rate limiting (optional, not implemented yet)
-    ENABLE_RATE_LIMITING: bool = Field(
-        default=False, validation_alias="ENABLE_RATE_LIMITING"
-    )
-    RATE_LIMIT_REQUESTS_PER_MINUTE: int = Field(
-        default=60, validation_alias="RATE_LIMIT_REQUESTS_PER_MINUTE"
-    )
-
     # Tool calling configuration
     MAX_TOOL_ROUNDS: int = Field(
         default=5,

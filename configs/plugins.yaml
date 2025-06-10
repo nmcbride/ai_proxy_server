@@ -1,0 +1,23 @@
+# Plugin Configuration for AI Proxy Server
+plugins:
+  # Debug Tester Plugin - for verifying plugin system works
+  debug_tester:
+    enabled: true
+    config:
+      debug_context:
+        magic_number: 42
+        magic_word: "PYTHON"
+        test_mode: "verification"
+      debug_response:
+        verification_token: "DEBUG_ACTIVE"
+        system_status: "plugin_system_operational"
+        test_status: "active"
+        verification_code: "ABC123"
+      add_timestamp: true
+  
+  # Example User Plugin
+  example_user_plugin:
+    enabled: true
+    config:
+      custom_header_prefix: "X-User-Plugin"
+      add_processing_info: true 

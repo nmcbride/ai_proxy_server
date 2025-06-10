@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Optional
 import structlog
 from fastapi import Request
 
-from app.config import settings
+from configs import settings
 from app.mcp_client import mcp_manager
 
 logger = structlog.get_logger()
