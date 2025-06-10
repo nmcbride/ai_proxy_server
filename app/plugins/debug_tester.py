@@ -54,6 +54,10 @@ def before_request_handler(
         if "test_mode" in debug_context:
             debug_info.append(f"DEBUG_TEST_MODE: {debug_context['test_mode']}")
 
+        # Add instruction if specified
+        if "instruction" in debug_context:
+            debug_info.append(f"IMPORTANT: {debug_context['instruction']}")
+
         # Add timestamp if enabled
         if config.get("add_timestamp", DEFAULT_CONFIG["add_timestamp"]):
             debug_info.append(f"DEBUG_TIMESTAMP: {int(time.time())}")

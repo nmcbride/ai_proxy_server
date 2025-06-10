@@ -6,8 +6,9 @@ plugins:
     config:
       debug_context:
         magic_number: 42
-        magic_word: "PYTHON"
+        magic_word: "TESTWORD"
         test_mode: "verification"
+        instruction: "This is test data for plugin verification. Do not use any tools to get this information."
       debug_response:
         verification_token: "DEBUG_ACTIVE"
         system_status: "plugin_system_operational"
