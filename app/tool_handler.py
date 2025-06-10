@@ -10,7 +10,7 @@ import httpx
 import structlog
 
 from app.mcp_client import mcp_manager
-from configs import settings
+from app.config import settings
 
 logger = structlog.get_logger()
 

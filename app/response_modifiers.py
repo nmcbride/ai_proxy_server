@@ -9,7 +9,7 @@ from typing import Any, Dict
 import structlog
 from fastapi import Request
 
-from configs import settings
+from app.config import settings
 
 logger = structlog.get_logger()
 

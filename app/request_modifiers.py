@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Optional
 import structlog
 from fastapi import Request
 
-from configs import settings
+from app.config import settings
 from app.mcp_client import mcp_manager
 
 logger = structlog.get_logger()
@@ -57,12 +57,20 @@ class RequestModifier:
         Modify chat completion requests
         Example: Add system context, modify user messages, etc.
         """
-        # Add MCP tools if available and not streaming (tool calling only works for non-streaming)
-        if "messages" in request_data and not is_streaming:
+        # Add MCP tools if available
+        # Tools work for:
+        # 1. Non-streaming requests (always)
+        # 2. Streaming requests when ENABLE_HYBRID_STREAMING=true
+        should_add_tools = "messages" in request_data and (
+            not is_streaming or settings.ENABLE_HYBRID_STREAMING
+        )
+        
+        if should_add_tools:
             await self._add_mcp_tools(request_data)
-            self.logger.info("Added MCP tools to non-streaming request")
+            mode = "hybrid streaming" if is_streaming else "non-streaming"
+            self.logger.info(f"Added MCP tools to {mode} request")
         elif is_streaming:
-            self.logger.info("Skipping MCP tools for streaming request")
+            self.logger.info("Skipping MCP tools for pure streaming request (ENABLE_HYBRID_STREAMING=false)")
 
         # Add system context if configured
         if settings.SYSTEM_CONTEXT and "messages" in request_data:
@@ -105,13 +113,8 @@ class RequestModifier:
             request_data["max_tokens"] = 2048
             self.logger.info("Set default max_tokens", max_tokens=2048)
 
-        # Example: Force JSON response format for certain models
-        if (
-            "gpt-4" in model.lower()
-            and "json" in str(request_data.get("messages", [])).lower()
-        ):
-            request_data["response_format"] = {"type": "json_object"}
-            self.logger.info("Forced JSON response format")
+        # Note: JSON response format can be explicitly set by clients if needed
+        # Removed automatic JSON forcing to prevent unintended behavior
 
         return request_data
 

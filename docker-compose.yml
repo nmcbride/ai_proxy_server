@@ -1,9 +1,9 @@
 version: '3.8'
 
 services:
-  # LiteLLM Proxy Server (upstream)
   litellm:
-    image: ghcr.io/berriai/litellm:main-latest
+    # image: ghcr.io/berriai/litellm:main-latest
+    image: ghcr.io/berriai/litellm:main-v1.72.2.rc
     container_name: litellm-server
     restart: unless-stopped
     command:

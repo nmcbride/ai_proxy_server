@@ -12,7 +12,7 @@ from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 
-from configs import settings
+from app.config import settings
 from app.mcp_client import mcp_manager
 from app.mcp_config import mcp_config
 from app.middleware import LoggingMiddleware, ProxyMiddleware
@@ -130,6 +130,19 @@ async def get_config() -> dict:
         "REQUEST_TIMEOUT": settings.REQUEST_TIMEOUT,
         "LITELLM_BASE_URL": settings.LITELLM_BASE_URL,
         "SYSTEM_CONTEXT": settings.SYSTEM_CONTEXT[:100] + "..." if settings.SYSTEM_CONTEXT and len(settings.SYSTEM_CONTEXT) > 100 else settings.SYSTEM_CONTEXT,
+    }
+
+
+@app.api_route("/debug/mcp/status", methods=["GET"])
+async def get_mcp_status() -> dict:
+    """Get MCP server status and available tools"""
+    return {
+        "servers": mcp_manager.get_server_status(),
+        "tools": mcp_manager.get_all_tools(),
+        "resources": mcp_manager.get_all_resources(),
+        "prompts": mcp_manager.get_all_prompts(),
+        "tool_registry": mcp_manager.tool_registry,
+        "formatted_tools": mcp_manager.format_tools_for_ai(),
     }
 
 

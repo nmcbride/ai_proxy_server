@@ -23,7 +23,7 @@ class TestResult:
 
 
 class ComprehensiveTestSuite:
-    def __init__(self, base_url: str = "http://localhost:8001"):
+    def __init__(self, base_url: str = "http://localhost:8000"):
         self.base_url = base_url
         self.results: List[TestResult] = []
         self.server_config = {}

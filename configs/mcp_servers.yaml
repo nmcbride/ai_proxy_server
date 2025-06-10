@@ -1,23 +1,16 @@
 mcp_servers:
-  # Debug server for testing tool calls (only server enabled for testing)
-  debug:
+  # Debug server for testing tool calls
+  python_debug:
     transport: stdio
     command: uv
     args: ["run", "python", "mcp_servers/debug_server.py"]
     description: "Debug tools for testing MCP integration"
   
-  # Example weather server (disabled for testing)
-  # weather:
-  #   transport: stdio
-  #   command: uv
-  #   args: ["run", "python", "examples/weather_server.py"]
-  #   description: "Weather information and forecasts"
-  
-  # Example Node.js MCP server (if you have one)
-  # nodejs_example:
+  # Example Node.js MCP server (disabled to test performance)
+  # nodejs_filesytem:
   #   transport: stdio
   #   command: npx
-  #   args: ["@modelcontextprotocol/server-filesystem", "/safe/path"]
+  #   args: ["@modelcontextprotocol/server-filesystem", "./test_scripts"]
   #   description: "Node.js filesystem MCP server"
   
   # Example file system server (disabled for testing)

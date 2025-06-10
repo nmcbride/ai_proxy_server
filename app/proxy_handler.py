@@ -12,7 +12,7 @@ from fastapi import HTTPException, Request, Response
 from fastapi.responses import StreamingResponse
 from starlette.background import BackgroundTask
 
-from configs import settings
+from app.config import settings
 from app.request_modifiers import RequestModifier
 from app.response_modifiers import ResponseModifier
 from app.tool_handler import handle_tool_calls

@@ -1,127 +1,137 @@
-# Test Scripts
+# AI Proxy Server - Test Suite
 
-This directory contains test scripts for the AI Proxy Server, organized by functionality and testing purpose.
+This directory contains all test scripts for validating the AI proxy server functionality.
 
-## 🚀 Recommended Testing (Start Here)
+## Test Scripts
 
-### Comprehensive Test Suite
-- **`test_comprehensive.py`** - **⭐ MAIN TEST SCRIPT** - Tests all modes and scenarios in one run
-- **`test_all_modes.py`** - **⭐ COMPLETE VALIDATION** - Tests both direct streaming and hybrid streaming modes
+### 🧪 Core Functionality Tests
 
-### Quick Usage
+#### `test_proxy_streaming.py` ⭐ **RECOMMENDED STARTING POINT**
+**Purpose**: Modern Python test suite for core proxy functionality
+- ✅ Health check validation
+- ✅ Non-streaming chat completions
+- ✅ Streaming chat completions with metrics
+- ✅ CORS header validation
+- 📊 Beautiful console output with performance metrics
+
+**Usage**:
 ```bash
-# Test current server configuration (respects current ENABLE_HYBRID_STREAMING setting)
-python test_scripts/test_comprehensive.py
-
-# Test BOTH streaming modes (automatically tests direct + hybrid streaming)
-python test_scripts/test_all_modes.py
+cd test_scripts
+uv run python test_proxy_streaming.py
 ```
 
-### What Gets Tested
-The comprehensive suite covers:
+#### `test_comprehensive.py`
+**Purpose**: Advanced test suite for all server modes and configurations
+- Tests hybrid streaming vs direct streaming modes
+- Validates MCP tool integration
+- Performance benchmarking across different modes
+- Error handling verification
 
-| Mode | Tools | Test Case | Expected Behavior |
-|------|-------|-----------|-------------------|
-| Non-streaming | ✅ | Debug tools query | Tool execution → Final response |
-| Non-streaming | ❌ | Haiku request | Direct response (no tools) |
-| Direct streaming | ❌ | Debug tools query | Skip tools → Stream response |
-| Hybrid streaming | ✅ | Debug tools query | Tool execution → Stream final response |
-| Hybrid streaming | ❌ | Story request | Stream response (no tools needed) |
-
-## 🔧 Legacy/Specific Test Scripts
-
-### Debug Scripts
-- **`debug_simple.py`** - Basic debug script for simple proxy testing
-- **`debug_client.py`** - Client debug script for testing proxy connections
-- **`debug_direct.py`** - Direct LiteLLM testing without proxy
-- **`debug_real_time.py`** - Real-time streaming test script
-
-### Functional Test Scripts
-- **`test_hybrid_streaming.py`** - Tests hybrid streaming functionality (tool calling + streaming final response)
-- **`test_mcp_flow.py`** - Comprehensive MCP (Model Context Protocol) flow testing
-- **`test_minimal_proxy.py`** - Minimal proxy functionality test
-
-### Shell Scripts
-- **`test_litellm_direct.sh`** - Shell script for testing direct LiteLLM connections
-- **`test_proxy_streaming.sh`** - Shell script for testing proxy streaming functionality
-- **`test_streaming_comparison.sh`** - Compares streaming performance between direct LiteLLM and proxy
-
-## 📋 Usage Instructions
-
-### Running Comprehensive Tests
+**Usage**:
 ```bash
-# From project root - test current configuration
-uv run python test_scripts/test_comprehensive.py
-
-# Test both streaming modes (recommended for full validation)
-uv run python test_scripts/test_all_modes.py
+cd test_scripts
+uv run python test_comprehensive.py
 ```
 
-### Running Legacy/Specific Tests
+#### `test_mcp_flow.py`
+**Purpose**: Specialized testing for MCP (Model Context Protocol) tool calling
+- Tests tool detection and execution
+- Validates tool call responses
+- MCP server connection testing
+
+**Usage**:
 ```bash
-# From project root
-uv run python test_scripts/test_hybrid_streaming.py
-uv run python test_scripts/test_mcp_flow.py
-uv run python test_scripts/debug_client.py
+cd test_scripts
+uv run python test_mcp_flow.py
 ```
 
-### Running Shell Scripts
+### 🌐 Web Client Tests
+
+#### `test_web_client.html`
+**Purpose**: Interactive browser-based testing for web client compatibility
+- 🌊 Interactive streaming tests
+- 📄 Non-streaming tests
+- ✅ CORS validation from browsers
+- 🎨 Visual feedback and real-time metrics
+- 🖱️ Click-to-test interface
+
+**Usage**:
+1. Ensure proxy server is running on `localhost:8001`
+2. Open `test_scripts/test_web_client.html` in a web browser
+3. Click test buttons to validate functionality
+
+## Quick Testing Guide
+
+### 1. Start Here - Basic Functionality ⭐
 ```bash
-# From project root
-chmod +x test_scripts/*.sh
-./test_scripts/test_streaming_comparison.sh
-./test_scripts/test_proxy_streaming.sh
+cd test_scripts
+uv run python test_proxy_streaming.py
+```
+**Expected**: All 4 tests pass (Health, Non-Streaming, Streaming, CORS)
+
+### 2. Web Browser Compatibility
+```bash
+# Open in browser (requires running server)
+open test_scripts/test_web_client.html
+```
+**Expected**: Both streaming and non-streaming tests work in browser
+
+### 3. MCP Tool Integration
+```bash
+cd test_scripts
+uv run python test_mcp_flow.py
+```
+**Expected**: Tool calling and execution work properly
+
+### 4. Advanced/Complete Testing
+```bash
+cd test_scripts
+uv run python test_comprehensive.py
+```
+**Expected**: All modes and configurations work correctly
+
+## File Overview
+
+| File | Purpose | Type | Complexity |
+|------|---------|------|------------|
+| `test_proxy_streaming.py` | ⭐ Main testing | Python | Simple |
+| `test_web_client.html` | Browser testing | HTML/JS | Simple |
+| `test_comprehensive.py` | Advanced testing | Python | Complex |
+| `test_mcp_flow.py` | Tool calling | Python | Medium |
+| `README.md` | Documentation | Markdown | - |
+
+## Test Requirements
+
+- AI proxy server running on `localhost:8001`
+- Valid OpenAI API key configured in the proxy
+- Python dependencies: `httpx`, `asyncio` (handled by uv)
+- For MCP tests: MCP servers configured in `configs/mcp_servers.yaml`
+- For web tests: Modern web browser with JavaScript enabled
+
+## Expected Results
+
+✅ **All tests should pass** when:
+- Proxy server is properly configured and running
+- OpenAI API key is valid and has quota
+- MCP servers are running (for MCP-specific tests)
+- CORS headers are properly configured
+
+❌ **Tests may fail** due to:
+- Network connectivity issues
+- Invalid or exhausted API key
+- Proxy server not running on expected port
+- MCP server connection problems
+- CORS policy restrictions (web tests only)
+
+## Troubleshooting
+
+**Server not reachable**: Ensure server is running on port 8001
+```bash
+uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8001
 ```
 
-## 🔍 Understanding Streaming Modes
+**API errors**: Check your OpenAI API key configuration
 
-### Direct Streaming (`ENABLE_HYBRID_STREAMING=false`)
-- Streaming requests skip tool calling entirely
-- Fast response times
-- No tool integration
-- Good for pure content generation
+**CORS issues**: Ensure CORS headers are enabled (should work automatically)
 
-### Hybrid Streaming (`ENABLE_HYBRID_STREAMING=true`) 
-- Streaming requests can use tools first, then stream final response
-- Tool execution + streaming final response
-- Longer initial delay but streaming final answer
-- Best of both worlds: tool capabilities + streaming UX
-
-## Prerequisites
-
-- AI Proxy Server running on port 8001
-- LiteLLM server running on port 4000  
-- MCP servers configured and running
-- Valid API keys configured
-
-## Test Categories
-
-### Performance Tests
-- `test_streaming_comparison.sh` - Streaming performance
-- `debug_real_time.py` - Real-time response timing
-- **`test_comprehensive.py`** - Performance comparison across all modes
-
-### Functionality Tests  
-- **`test_comprehensive.py`** - All modes and tool scenarios
-- **`test_all_modes.py`** - Both streaming mode validation
-- `test_hybrid_streaming.py` - Hybrid streaming mode
-- `test_mcp_flow.py` - Tool calling workflows
-- `test_minimal_proxy.py` - Basic proxy functions
-
-### Debug/Development
-- `debug_simple.py` - Quick debugging
-- `debug_client.py` - Client-side debugging  
-- `debug_direct.py` - LiteLLM direct testing
-
-## Environment Variables
-
-Key environment variables for testing:
-```bash
-export ENABLE_HYBRID_STREAMING=true   # Enable hybrid streaming mode
-export MAX_TOOL_ROUNDS=5             # Max tool calling rounds
-export TOOL_EXECUTION_TIMEOUT=30.0   # Tool execution timeout
-export LITELLM_BASE_URL=http://localhost:4000
-export PROXY_BASE_URL=http://localhost:8001
-```
-
-The `test_all_modes.py` script automatically tests both `ENABLE_HYBRID_STREAMING=true` and `ENABLE_HYBRID_STREAMING=false` modes. 
+**MCP errors**: Check that MCP servers are configured and running 
