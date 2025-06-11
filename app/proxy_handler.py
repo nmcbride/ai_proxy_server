@@ -181,9 +181,10 @@ async def handle_hybrid_streaming_request(
         }
         yield f"data: {json.dumps(chunk_data)}\n\n"
 
-        # Stream content in chunks (simulate natural streaming)
-        words = final_content.split()
-        for i, word in enumerate(words):
+        # Stream content in character chunks (preserves all formatting)
+        chunk_size = 30  # Characters per chunk for natural streaming feel
+        for i in range(0, len(final_content), chunk_size):
+            chunk_text = final_content[i:i + chunk_size]
             chunk_data = {
                 "id": response_data.get("id", ""),
                 "object": "chat.completion.chunk",
@@ -192,15 +193,16 @@ async def handle_hybrid_streaming_request(
                 "choices": [
                     {
                         "index": 0,
-                        "delta": {"content": word + (" " if i < len(words) - 1 else "")},
+                        "delta": {"content": chunk_text},
                         "finish_reason": None,
                     }
                 ],
             }
             yield f"data: {json.dumps(chunk_data)}\n\n"
 
-            # Small delay to simulate natural streaming
-            await asyncio.sleep(0.02)
+            # Configurable delay to simulate natural streaming
+            if settings.HYBRID_STREAMING_DELAY > 0:
+                await asyncio.sleep(settings.HYBRID_STREAMING_DELAY)
 
         # Send final chunk with finish reason
         chunk_data = {

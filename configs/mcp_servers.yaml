@@ -6,12 +6,27 @@ mcp_servers:
     args: ["run", "python", "mcp_servers/debug_server.py"]
     description: "Debug tools for testing MCP integration"
   
-  # Example Node.js MCP server (disabled to test performance)
-  # nodejs_filesytem:
+  # Proxy status server for monitoring the AI proxy
+  python_proxy_status:
+    transport: stdio
+    command: uv
+    args: ["run", "python", "mcp_servers/get_proxy_status.py"]
+    description: "Get comprehensive status information about the AI Proxy Server"
+  
+  # Node.js filesystem MCP server with restrictions
+  # nodejs_filesystem:
   #   transport: stdio
   #   command: npx
-  #   args: ["@modelcontextprotocol/server-filesystem", "./test_scripts"]
-  #   description: "Node.js filesystem MCP server"
+  #   args: 
+  #     - "-y"
+  #     - "@modelcontextprotocol/server-filesystem"
+  #     - "./test_scripts"    # Only allow access to test_scripts directory
+  #     - "./configs"         # Only allow access to configs directory  
+  #   description: "Restricted Node.js filesystem MCP server"
+  #   # Additional configuration options available:
+  #   # - The server automatically restricts access to only specified directories
+  #   # - File operations are sandboxed to these paths
+  #   # - No additional YAML config needed - restrictions are built-in
   
   # Example file system server (disabled for testing)
   # filesystem:

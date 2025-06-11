@@ -3,6 +3,7 @@ Tool calling handler for MCP integration
 """
 
 import json
+import time
 from typing import Any, Dict
 import asyncio
 
@@ -27,6 +28,8 @@ async def handle_tool_calls(
     Handle tool calls by executing MCP tools and sending results back to LLM
     Supports multi-step tool calling (e.g., Context7's resolve-library-id -> get-library-docs)
     """
+    overall_start_time = time.time()
+    
     messages = original_request.get("messages", []).copy()
     current_response = initial_response
     max_tool_rounds = settings.MAX_TOOL_ROUNDS
@@ -75,6 +78,8 @@ async def handle_tool_calls(
                     arguments_str = function_info.get("arguments", "{}")
                     arguments = json.loads(arguments_str) if arguments_str else {}
 
+                    tool_start_time = time.time()
+                    
                     logger.info(
                         "Executing MCP tool",
                         proxy_request_id=proxy_request_id,
@@ -88,6 +93,8 @@ async def handle_tool_calls(
                         mcp_manager.call_tool(function_name, arguments),
                         timeout=settings.TOOL_EXECUTION_TIMEOUT
                     )
+                    
+                    tool_execution_time = time.time() - tool_start_time
 
                     # Format result as string (MCP returns content objects)
                     if isinstance(result, list) and result:
@@ -110,12 +117,23 @@ async def handle_tool_calls(
                             "content": result_text,
                         }
                     )
+                    
+                    # Debug: Log the actual content being sent to LLM
+                    logger.info(
+                        "Tool result content preview",
+                        proxy_request_id=proxy_request_id,
+                        tool=function_name,
+                        content_length=len(result_text),
+                        has_newlines="\n" in result_text,
+                        first_100_chars=result_text[:100].replace('\n', '\\n'),
+                    )
 
                     logger.info(
                         "MCP tool executed successfully",
                         proxy_request_id=proxy_request_id,
                         round=tool_round,
                         tool=function_name,
+                        execution_time_ms=round(tool_execution_time * 1000, 2),
                     )
 
                 except asyncio.TimeoutError:
@@ -195,10 +213,13 @@ async def handle_tool_calls(
             max_rounds=settings.MAX_TOOL_ROUNDS,
         )
 
+    overall_execution_time = time.time() - overall_start_time
+    
     logger.info(
         "Tool calling completed",
         proxy_request_id=proxy_request_id,
         total_rounds=tool_round - 1,
+        total_time_ms=round(overall_execution_time * 1000, 2),
     )
 
     return current_response

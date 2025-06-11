@@ -236,6 +236,7 @@ class RequestModifier:
                         "You have access to the following tools:\n"
                         + "\n".join(tool_descriptions)
                         + "\n\nYou can call these tools when needed to help the user."
+                        + "\n\nIMPORTANT: When a tool returns formatted content (like markdown), display it exactly as returned. Do not reformat, summarize, or modify tool responses - preserve all line breaks and formatting."
                     )
 
                     # Find existing system message or create new one

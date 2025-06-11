@@ -2,6 +2,7 @@
 Simple MCP Client for connecting to external MCP servers
 """
 
+import time
 from contextlib import AsyncExitStack
 from typing import Any, Dict, List, Optional
 
@@ -161,13 +162,25 @@ class MCPServerConnection:
         if not self.connected or not self.session:
             raise RuntimeError(f"Not connected to MCP server: {self.name}")
 
+        start_time = time.time()
         try:
             result = await self.session.call_tool(tool_name, arguments)
-            logger.info("Tool called successfully", server=self.name, tool=tool_name)
+            execution_time = time.time() - start_time
+            logger.info(
+                "Tool called successfully", 
+                server=self.name, 
+                tool=tool_name,
+                mcp_execution_time_ms=round(execution_time * 1000, 2)
+            )
             return result.content
         except Exception as e:
+            execution_time = time.time() - start_time
             logger.error(
-                "Tool call failed", server=self.name, tool=tool_name, error=str(e)
+                "Tool call failed", 
+                server=self.name, 
+                tool=tool_name, 
+                error=str(e),
+                mcp_execution_time_ms=round(execution_time * 1000, 2)
             )
             raise
 
