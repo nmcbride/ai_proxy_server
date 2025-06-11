@@ -17,6 +17,7 @@ from app.mcp_client import mcp_manager
 from app.mcp_config import mcp_config
 from app.middleware import LoggingMiddleware, ProxyMiddleware
 from app.plugin_system import PluginManager
+from app.profiling_endpoint import profiling_router
 from app.proxy_handler import proxy_request, set_plugin_manager
 
 # Configure structured logging
@@ -101,6 +102,9 @@ app.add_middleware(
 # Add custom middleware
 app.add_middleware(LoggingMiddleware)
 app.add_middleware(ProxyMiddleware)
+
+# Add profiling router
+app.include_router(profiling_router)
 
 async def get_http_client() -> httpx.AsyncClient:
     """Dependency to get the HTTP client"""

@@ -38,7 +38,7 @@ class RequestModifier:
         if not settings.ENABLE_REQUEST_MODIFICATION:
             return request_data
 
-        self.logger.info("Modifying request", path=path)
+        self.logger.debug("Modifying request", path=path)
 
         # Route to specific modifier based on endpoint
         if path == "/v1/chat/completions":
@@ -68,7 +68,7 @@ class RequestModifier:
         if should_add_tools:
             await self._add_mcp_tools(request_data)
             mode = "hybrid streaming" if is_streaming else "non-streaming"
-            self.logger.info(f"Added MCP tools to {mode} request")
+            self.logger.debug(f"Added MCP tools to {mode} request")
         elif is_streaming:
             self.logger.info("Skipping MCP tools for pure streaming request (ENABLE_HYBRID_STREAMING=false)")
 
@@ -106,12 +106,12 @@ class RequestModifier:
         if "gpt-4" in model.lower() and "temperature" not in request_data:
             # Set conservative temperature for GPT-4 models
             request_data["temperature"] = 0.3
-            self.logger.info("Set conservative temperature for GPT-4", temperature=0.3)
+            self.logger.debug("Set conservative temperature for GPT-4", temperature=0.3)
 
         # Example: Add default max_tokens if not specified
         if "max_tokens" not in request_data:
             request_data["max_tokens"] = 2048
-            self.logger.info("Set default max_tokens", max_tokens=2048)
+            self.logger.debug("Set default max_tokens", max_tokens=2048)
 
         # Note: JSON response format can be explicitly set by clients if needed
         # Removed automatic JSON forcing to prevent unintended behavior
@@ -218,7 +218,7 @@ class RequestModifier:
                 if "tool_choice" not in request_data:
                     request_data["tool_choice"] = "auto"
 
-                self.logger.info(
+                self.logger.debug(
                     "Added MCP tools to request", tool_count=len(mcp_tools)
                 )
 
@@ -256,7 +256,7 @@ class RequestModifier:
                         # Add new system message at the beginning
                         messages.insert(0, {"role": "system", "content": tool_info})
 
-                    self.logger.info("Added tool information to system message")
+                    self.logger.debug("Added tool information to system message")
 
         except Exception as e:
             self.logger.error("Failed to add MCP tools to request", error=str(e))

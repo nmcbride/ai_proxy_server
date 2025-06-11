@@ -12,6 +12,7 @@ import structlog
 
 from app.mcp_client import mcp_manager
 from app.config import settings
+from app.profiler import get_profiler
 
 logger = structlog.get_logger()
 
@@ -29,6 +30,9 @@ async def handle_tool_calls(
     Supports multi-step tool calling (e.g., Context7's resolve-library-id -> get-library-docs)
     """
     overall_start_time = time.time()
+    
+    # Get profiler for this request
+    profiler = get_profiler(proxy_request_id)
     
     messages = original_request.get("messages", []).copy()
     current_response = initial_response
@@ -75,8 +79,9 @@ async def handle_tool_calls(
 
                 try:
                     # Parse arguments
-                    arguments_str = function_info.get("arguments", "{}")
-                    arguments = json.loads(arguments_str) if arguments_str else {}
+                    async with profiler.time_phase("Parsing Tool Arguments", tool=function_name) if profiler else None:
+                        arguments_str = function_info.get("arguments", "{}")
+                        arguments = json.loads(arguments_str) if arguments_str else {}
 
                     tool_start_time = time.time()
                     
@@ -89,37 +94,39 @@ async def handle_tool_calls(
                     )
 
                     # Call the MCP tool with timeout
-                    result = await asyncio.wait_for(
-                        mcp_manager.call_tool(function_name, arguments),
-                        timeout=settings.TOOL_EXECUTION_TIMEOUT
-                    )
+                    async with profiler.time_phase("Executing MCP Tool", tool=function_name, round=tool_round) if profiler else None:
+                        result = await asyncio.wait_for(
+                            mcp_manager.call_tool(function_name, arguments),
+                            timeout=settings.TOOL_EXECUTION_TIMEOUT
+                        )
                     
                     tool_execution_time = time.time() - tool_start_time
 
                     # Format result as string (MCP returns content objects)
-                    if isinstance(result, list) and result:
-                        # MCP returns list of content objects
-                        result_text = ""
-                        for content in result:
-                            if hasattr(content, "text"):
-                                result_text += content.text
-                            elif isinstance(content, dict) and "text" in content:
-                                result_text += content["text"]
-                            else:
-                                result_text += str(content)
-                    else:
-                        result_text = str(result)
+                    async with profiler.time_phase("Formatting Tool Results", tool=function_name) if profiler else None:
+                        if isinstance(result, list) and result:
+                            # MCP returns list of content objects
+                            result_text = ""
+                            for content in result:
+                                if hasattr(content, "text"):
+                                    result_text += content.text
+                                elif isinstance(content, dict) and "text" in content:
+                                    result_text += content["text"]
+                                else:
+                                    result_text += str(content)
+                        else:
+                            result_text = str(result)
 
-                    tool_results.append(
-                        {
-                            "role": "tool",
-                            "tool_call_id": tool_call_id,
-                            "content": result_text,
-                        }
-                    )
+                        tool_results.append(
+                            {
+                                "role": "tool",
+                                "tool_call_id": tool_call_id,
+                                "content": result_text,
+                            }
+                        )
                     
                     # Debug: Log the actual content being sent to LLM
-                    logger.info(
+                    logger.debug(
                         "Tool result content preview",
                         proxy_request_id=proxy_request_id,
                         tool=function_name,
@@ -128,7 +135,7 @@ async def handle_tool_calls(
                         first_100_chars=result_text[:100].replace('\n', '\\n'),
                     )
 
-                    logger.info(
+                    logger.debug(
                         "MCP tool executed successfully",
                         proxy_request_id=proxy_request_id,
                         round=tool_round,
@@ -188,23 +195,27 @@ async def handle_tool_calls(
         )
 
         # Make next request with tool results
-        new_body = json.dumps(new_request).encode()
+        async with profiler.time_phase("Preparing Tool Results Request", round=tool_round) if profiler else None:
+            new_body = json.dumps(new_request).encode()
 
-        # Update headers
-        new_headers = headers.copy()
-        new_headers["content-length"] = str(len(new_body))
+            # Update headers
+            new_headers = headers.copy()
+            new_headers["content-length"] = str(len(new_body))
 
-        # Build and send request for tool calling follow-up
-        tool_request = client.build_request(
-            method="POST",
-            url=upstream_url,
-            headers=new_headers,
-            content=new_body,
-        )
-        next_response = await client.send(tool_request)
+            # Build and send request for tool calling follow-up
+            tool_request = client.build_request(
+                method="POST",
+                url=upstream_url,
+                headers=new_headers,
+                content=new_body,
+            )
+        
+        async with profiler.time_phase("Sending Tool Results to AI", round=tool_round) if profiler else None:
+            next_response = await client.send(tool_request)
 
         # Parse response for next round
-        current_response = json.loads(next_response.content)
+        async with profiler.time_phase("Processing Tool Results Response", round=tool_round) if profiler else None:
+            current_response = json.loads(next_response.content)
 
     if tool_round >= max_tool_rounds:
         logger.warning(
@@ -215,7 +226,7 @@ async def handle_tool_calls(
 
     overall_execution_time = time.time() - overall_start_time
     
-    logger.info(
+    logger.debug(
         "Tool calling completed",
         proxy_request_id=proxy_request_id,
         total_rounds=tool_round - 1,

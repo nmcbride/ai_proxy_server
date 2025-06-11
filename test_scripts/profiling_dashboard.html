@@ -1,0 +1,836 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Proxy Server - Profiling Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #fafafa;
+            color: #333;
+            line-height: 1.5;
+        }
+
+        .header {
+            background: #2563eb;
+            color: white;
+            padding: 24px;
+            text-align: center;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .header p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .controls {
+            background: white;
+            padding: 20px 24px;
+            border-bottom: 1px solid #e5e7eb;
+            display: flex;
+            gap: 16px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            background: #2563eb;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: background 0.2s;
+        }
+
+        .btn:hover {
+            background: #1d4ed8;
+        }
+
+        .btn.secondary {
+            background: #6b7280;
+        }
+
+        .btn.secondary:hover {
+            background: #4b5563;
+        }
+
+        .status {
+            display: flex;
+            gap: 24px;
+            align-items: center;
+            margin-left: auto;
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 14px;
+            color: #6b7280;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #10b981;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+
+        .requests-grid {
+            display: grid;
+            gap: 16px;
+        }
+
+        .request-card {
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            overflow: hidden;
+            transition: box-shadow 0.2s;
+        }
+
+        .request-card:hover {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .request-header {
+            padding: 16px 20px;
+            background: #f9fafb;
+            border-bottom: 1px solid #e5e7eb;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .request-header:hover {
+            background: #f3f4f6;
+        }
+
+        .request-info {
+            flex: 1;
+        }
+
+        .request-id {
+            font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+            font-size: 12px;
+            color: #6b7280;
+            margin-bottom: 6px;
+        }
+
+        .request-summary {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+        }
+
+        .total-time {
+            font-size: 18px;
+            font-weight: 600;
+            color: #1f2937;
+        }
+
+        .phase-count {
+            color: #6b7280;
+            font-size: 14px;
+        }
+
+        .model {
+            color: #3b82f6;
+            font-size: 13px;
+            font-weight: 500;
+            background: #eff6ff;
+            padding: 2px 8px;
+            border-radius: 4px;
+            border: 1px solid #dbeafe;
+        }
+
+        .timestamp {
+            color: #9ca3af;
+            font-size: 12px;
+            margin-left: auto;
+        }
+
+        .expand-icon {
+            font-size: 14px;
+            color: #6b7280;
+            transition: transform 0.2s;
+        }
+
+        .request-card.expanded .expand-icon {
+            transform: rotate(180deg);
+        }
+
+        .request-details {
+            display: none;
+            padding: 20px;
+            background: white;
+        }
+
+        .request-card.expanded .request-details {
+            display: block;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+
+        .stat-card {
+            background: #f8fafc;
+            padding: 16px;
+            border-radius: 6px;
+            border: 1px solid #e2e8f0;
+        }
+
+        .stat-value {
+            font-size: 20px;
+            font-weight: 600;
+            color: #1f2937;
+            margin-bottom: 4px;
+        }
+
+        .stat-label {
+            color: #6b7280;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .timeline {
+            margin-top: 20px;
+        }
+
+        .timeline-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .timeline-header h4 {
+            font-size: 16px;
+            font-weight: 600;
+            color: #1f2937;
+        }
+
+        .timeline-scale {
+            font-size: 12px;
+            color: #9ca3af;
+        }
+
+        .phase-item {
+            margin-bottom: 12px;
+            display: grid;
+            grid-template-columns: 260px 1fr 70px;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .phase-name {
+            font-size: 13px;
+            color: #4b5563;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .phase-name.main-phase {
+            font-weight: 700 !important;
+            color: #1f2937 !important;
+        }
+
+        .phase-bar-container {
+            height: 16px;
+            background: #f3f4f6;
+            border-radius: 8px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .phase-bar {
+            height: 100%;
+            border-radius: 8px;
+            background: #3b82f6;
+            transition: width 0.3s ease;
+        }
+
+        .phase-duration {
+            text-align: right;
+            font-size: 12px;
+            font-weight: 500;
+            color: #374151;
+        }
+
+        .phase-metadata {
+            font-size: 11px;
+            color: #9ca3af;
+            margin-left: 272px;
+            margin-top: -8px;
+            margin-bottom: 8px;
+        }
+
+        .phase-metadata-sub {
+            margin-left: 252px;
+        }
+
+        .phase-group-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 20px 0 12px 0;
+            padding: 8px 12px;
+            background: #f1f5f9;
+            border-radius: 6px;
+            border-left: 4px solid #3b82f6;
+        }
+
+        .phase-group-name {
+            font-weight: 600;
+            color: #1e293b;
+            font-size: 14px;
+        }
+
+        .phase-group-total {
+            font-weight: 600;
+            color: #3b82f6;
+            font-size: 13px;
+        }
+
+        .group-scale {
+            font-size: 11px;
+            color: #9ca3af;
+            margin: -8px 0 8px 12px;
+            font-style: italic;
+        }
+
+        .phase-sub-item {
+            margin-left: 20px;
+            margin-bottom: 8px;
+            grid-template-columns: 240px 1fr 70px;
+        }
+
+        .no-data, .loading, .error {
+            text-align: center;
+            padding: 48px 24px;
+            background: white;
+            border-radius: 8px;
+            border: 1px solid #e5e7eb;
+        }
+
+        .loading {
+            color: #6b7280;
+        }
+
+        .error {
+            background: #fef2f2;
+            border-color: #fecaca;
+            color: #dc2626;
+        }
+
+        .no-data {
+            color: #6b7280;
+        }
+
+        .loading::after {
+            content: "...";
+            animation: dots 1.5s infinite;
+        }
+
+        @keyframes dots {
+            0%, 20% { content: "."; }
+            40% { content: ".."; }
+            60%, 100% { content: "..."; }
+        }
+
+        .refresh-info {
+            color: #9ca3af;
+            font-size: 12px;
+        }
+
+        /* Responsive design */
+        @media (max-width: 768px) {
+            .controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .status {
+                margin-left: 0;
+                flex-wrap: wrap;
+                gap: 12px;
+            }
+
+            .request-summary {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 4px;
+            }
+
+            .timestamp {
+                margin-left: 0;
+            }
+
+            .phase-item {
+                grid-template-columns: 200px 1fr 60px;
+                gap: 8px;
+            }
+
+            .phase-sub-item {
+                grid-template-columns: 180px 1fr 60px;
+            }
+
+            .phase-name {
+                font-size: 12px;
+            }
+
+            .phase-metadata {
+                margin-left: 208px;
+            }
+
+            .phase-metadata-sub {
+                margin-left: 188px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>AI Proxy Server Profiling Dashboard</h1>
+        <p>Real-time request performance monitoring</p>
+    </div>
+
+    <div class="controls">
+        <button class="btn" onclick="refreshData()">Refresh Data</button>
+        <button class="btn secondary" onclick="clearData()">Clear All</button>
+        <div class="status">
+            <div class="status-item">
+                <span class="status-dot" id="status-dot"></span>
+                <span>Status: <span id="status-text">Checking...</span></span>
+            </div>
+            <div class="status-item">
+                <span>Active: <span id="active-count">-</span></span>
+            </div>
+            <div class="status-item">
+                <span>Avg: <span id="avg-time">-</span>ms</span>
+            </div>
+        </div>
+        <div class="refresh-info">
+            Auto-refresh every 5s • Last updated: <span id="last-updated">Never</span>
+        </div>
+    </div>
+
+    <div class="container">
+        <div id="loading" class="loading">Loading profiling data</div>
+        <div id="error" class="error" style="display: none;"></div>
+        <div id="no-data" class="no-data" style="display: none;">
+            No active profiling sessions found. Make some requests to see profiling data.
+        </div>
+        <div id="requests-container" class="requests-grid" style="display: none;"></div>
+    </div>
+
+    <script>
+        const BASE_URL = 'http://localhost:8000';
+        let autoRefreshInterval;
+        let requestsData = new Map(); // Store all seen requests
+        let expandedRequests = new Set(); // Track which requests are expanded
+        let isFirstLoad = true;
+
+        // Initialize dashboard
+        document.addEventListener('DOMContentLoaded', function() {
+            refreshData();
+            startAutoRefresh();
+        });
+
+        function startAutoRefresh() {
+            autoRefreshInterval = setInterval(refreshData, 5000);
+        }
+
+        function stopAutoRefresh() {
+            if (autoRefreshInterval) {
+                clearInterval(autoRefreshInterval);
+            }
+        }
+
+        async function refreshData() {
+            try {
+                if (isFirstLoad) {
+                    showLoading();
+                }
+                await checkHealth();
+                await loadAndUpdateProfiles();
+                updateTimestamps(); // Update all timestamp displays
+                updateLastUpdated();
+                if (isFirstLoad) {
+                    hideLoading();
+                    isFirstLoad = false;
+                }
+            } catch (error) {
+                showError('Failed to load data: ' + error.message);
+            }
+        }
+
+        function updateTimestamps() {
+            // Update all visible timestamp displays
+            const requestCards = document.querySelectorAll('.request-card');
+            requestCards.forEach(card => {
+                const requestId = card.dataset.requestId;
+                const requestData = requestsData.get(requestId);
+                if (requestData && requestData.timestamp) {
+                    const timestampElement = card.querySelector('.timestamp');
+                    if (timestampElement) {
+                        timestampElement.textContent = formatTimeAgo(requestData.timestamp);
+                    }
+                }
+            });
+        }
+
+        async function checkHealth() {
+            const response = await fetch(`${BASE_URL}/profiling/health`);
+            const data = await response.json();
+            
+            const statusDot = document.getElementById('status-dot');
+            const statusText = document.getElementById('status-text');
+            
+            if (data.status === 'healthy') {
+                statusDot.style.background = '#10b981';
+                statusText.textContent = 'Healthy';
+            } else {
+                statusDot.style.background = '#ef4444';
+                statusText.textContent = 'Error';
+            }
+        }
+
+        async function loadAndUpdateProfiles() {
+            const response = await fetch(`${BASE_URL}/profiling/active`);
+            const data = await response.json();
+            
+            document.getElementById('active-count').textContent = data.active_profiles;
+            document.getElementById('avg-time').textContent = 
+                data.avg_request_time_ms ? data.avg_request_time_ms.toFixed(1) : '-';
+
+            // Load detailed data for new requests only
+            const newRequests = [];
+            for (const request of data.slowest_requests) {
+                if (!requestsData.has(request.request_id)) {
+                    try {
+                        const detailResponse = await fetch(`${BASE_URL}/profiling/export/${request.request_id}`);
+                        const detailData = await detailResponse.json();
+                        
+                        // Calculate actual request start time
+                        const now = performance.now();
+                        const requestAgeMs = detailData.export_timestamp || 0;
+                        detailData.timestamp = new Date(Date.now() - requestAgeMs); // Set to actual request start time
+                        
+                        requestsData.set(request.request_id, detailData);
+                        newRequests.push(detailData);
+                    } catch (error) {
+                        console.warn(`Failed to load details for ${request.request_id}:`, error);
+                    }
+                }
+            }
+
+            // Add new requests to the display
+            if (newRequests.length > 0) {
+                addNewRequests(newRequests);
+            }
+
+            // Update display if we have requests
+            if (requestsData.size > 0) {
+                document.getElementById('no-data').style.display = 'none';
+                document.getElementById('requests-container').style.display = 'grid';
+            } else if (isFirstLoad) {
+                showNoData();
+            }
+        }
+
+        function addNewRequests(newRequests) {
+            const container = document.getElementById('requests-container');
+            
+            // Sort new requests by timestamp (newest first) before adding
+            const sortedRequests = newRequests.sort((a, b) => b.timestamp - a.timestamp);
+            
+            // Add sorted requests to the top of the list (newest first)
+            sortedRequests.forEach(request => {
+                const card = createRequestCard(request);
+                container.insertBefore(card, container.firstChild);
+            });
+        }
+
+        function createRequestCard(request) {
+            const card = document.createElement('div');
+            card.className = 'request-card';
+            card.dataset.requestId = request.request_id; // Store request ID for reference
+            
+            const timeAgo = request.timestamp ? formatTimeAgo(request.timestamp) : 'Unknown';
+            
+            card.innerHTML = `
+                <div class="request-header" onclick="toggleCard(this)">
+                    <div class="request-info">
+                        <div class="request-id">${request.request_id}</div>
+                        <div class="request-summary">
+                            <span class="total-time">${request.summary.total_time_ms.toFixed(1)}ms</span>
+                            <span class="phase-count">${request.summary.phase_count} phases</span>
+                            <span class="model">${request.summary.metadata?.model || 'N/A'}</span>
+                            <span class="timestamp">${timeAgo}</span>
+                        </div>
+                    </div>
+                    <div class="expand-icon">▼</div>
+                </div>
+                <div class="request-details">
+                    ${createRequestDetails(request)}
+                </div>
+            `;
+            return card;
+        }
+
+        function formatTimeAgo(timestamp) {
+            const now = new Date();
+            const diff = now - timestamp;
+            const seconds = Math.floor(diff / 1000);
+            
+            if (seconds < 60) return `${seconds}s ago`;
+            const minutes = Math.floor(seconds / 60);
+            if (minutes < 60) return `${minutes}m ago`;
+            const hours = Math.floor(minutes / 60);
+            return `${hours}h ago`;
+        }
+
+        function createRequestDetails(request) {
+            const maxDuration = Math.max(...request.summary.phases.map(p => p.duration_ms));
+            
+            // Group phases by logical workflow sections
+            const phaseGroups = {
+                'Request Processing': [
+                    'Reading Request Data',
+                    'Parsing Request JSON',
+                    'Processing Request',
+                    'Running Pre-Processing Plugins',
+                    'Serializing Request JSON',
+                    'Building Upstream Request',
+                    'Converting to Non-Streaming'
+                ],
+                'AI Provider Communication': [
+                    'Calling AI Provider',
+                    'Streaming to AI Provider',
+                    'Initial Tool-Calling Request',
+                    'Sending Tool Results to AI'
+                ],
+                'Tool Calling': [
+                    'Processing Tool Calls',
+                    'Parsing Tool Arguments',
+                    'Executing MCP Tool',
+                    'Formatting Tool Results',
+                    'Preparing Tool Results Request'
+                ],
+                'Response Processing': [
+                    'Parsing AI Response',
+                    'Processing Response',
+                    'Running Post-Processing Plugins',
+                    'Processing Tool-Call Response',
+                    'Processing Tool Results Response',
+                    'Serializing Final Response'
+                ],
+                'Streaming': [
+                    'Processing Streaming Headers',
+                    'Extracting Streaming Content',
+                    'Creating Streaming Chunks'
+                ]
+            };
+            
+            // Create a map of phase names to phase data, but with enhanced names for tools/rounds
+            const phaseMap = new Map();
+            const enhancedPhases = [];
+            
+            request.summary.phases.forEach((phase, index) => {
+                // Keep display name clean, but create unique internal key for separate bars
+                const displayName = phase.name;
+                const metadata = phase.metadata || {};
+                
+                // Create unique key for mapping (so we get separate bars) but clean display name
+                let uniqueKey = `${phase.name}_${index}`;
+                
+                // Create enhanced phase object
+                const enhancedPhase = {
+                    ...phase,
+                    displayName: displayName,
+                    originalName: phase.name,
+                    uniqueKey: uniqueKey
+                };
+                
+                enhancedPhases.push(enhancedPhase);
+                phaseMap.set(uniqueKey, enhancedPhase);
+            });
+            
+            let phasesHtml = '';
+            
+            // Process each group
+            Object.entries(phaseGroups).forEach(([groupName, phaseNames]) => {
+                // Find phases that belong to this group by checking originalName
+                const groupPhases = enhancedPhases.filter(phase => 
+                    phaseNames.includes(phase.originalName)
+                );
+                
+                if (groupPhases.length > 0) {
+                    // Calculate total time and max duration for this group
+                    const groupTotal = groupPhases.reduce((sum, phase) => sum + phase.duration_ms, 0);
+                    const groupMaxDuration = Math.max(...groupPhases.map(p => p.duration_ms));
+                    
+                    // Add group header with total time and scale
+                    phasesHtml += `
+                        <div class="phase-group-header">
+                            <div class="phase-group-name">${groupName}</div>
+                            <div class="phase-group-total">${groupTotal.toFixed(1)}ms</div>
+                        </div>
+                        <div class="group-scale">Scale: 0ms → ${groupMaxDuration.toFixed(1)}ms</div>
+                    `;
+                    
+                    // Add individual phases in this group, in execution order
+                    groupPhases
+                        .forEach(phase => {
+                            // Scale within this group instead of globally
+                            const widthPercent = (phase.duration_ms / groupMaxDuration) * 100;
+                            const metadataItems = Object.entries(phase.metadata)
+                                .filter(([key, value]) => key !== 'request_id')
+                                .map(([key, value]) => `${key}: ${value}`)
+                                .join(', ');
+                            
+                            phasesHtml += `
+                                <div class="phase-item phase-sub-item">
+                                    <div class="phase-name">${phase.displayName}</div>
+                                    <div class="phase-bar-container">
+                                        <div class="phase-bar" style="width: ${widthPercent}%"></div>
+                                    </div>
+                                    <div class="phase-duration">${phase.duration_ms.toFixed(2)}ms</div>
+                                </div>
+                                ${metadataItems ? `<div class="phase-metadata phase-metadata-sub">${metadataItems}</div>` : ''}
+                            `;
+                        });
+                }
+            });
+
+            // Recalculate total time from only the displayed phases (excluding filtered parent phases)
+            const displayedTotalTime = enhancedPhases.reduce((sum, phase) => sum + phase.duration_ms, 0);
+            
+            const topPhases = enhancedPhases
+                .sort((a, b) => b.duration_ms - a.duration_ms)
+                .slice(0, 5);
+
+            return `
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-value">${displayedTotalTime.toFixed(1)}</div>
+                        <div class="stat-label">Total Time (ms)</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">${request.summary.phase_count}</div>
+                        <div class="stat-label">Phases</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">${request.summary.metadata?.model || 'N/A'}</div>
+                        <div class="stat-label">Model</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">${topPhases[0]?.name || 'N/A'}</div>
+                        <div class="stat-label">Slowest Phase</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">${topPhases[0]?.duration_ms.toFixed(1) || '0'}</div>
+                        <div class="stat-label">Slowest (ms)</div>
+                    </div>
+                </div>
+                <div class="timeline">
+                    <div class="timeline-header">
+                        <h4>Phase Timeline</h4>
+                        <span class="timeline-scale">Sequential execution order • Bars scaled within each group</span>
+                    </div>
+                    ${phasesHtml}
+                </div>
+            `;
+        }
+
+        function toggleCard(header) {
+            const card = header.parentElement;
+            const requestId = card.dataset.requestId;
+            
+            card.classList.toggle('expanded');
+            
+            // Track expanded state
+            if (card.classList.contains('expanded')) {
+                expandedRequests.add(requestId);
+            } else {
+                expandedRequests.delete(requestId);
+            }
+        }
+
+        function clearData() {
+            requestsData.clear();
+            expandedRequests.clear();
+            document.getElementById('requests-container').innerHTML = '';
+            document.getElementById('requests-container').style.display = 'none';
+            showNoData();
+        }
+
+        function showLoading() {
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('error').style.display = 'none';
+            document.getElementById('no-data').style.display = 'none';
+            document.getElementById('requests-container').style.display = 'none';
+        }
+
+        function hideLoading() {
+            document.getElementById('loading').style.display = 'none';
+        }
+
+        function showNoData() {
+            hideLoading();
+            document.getElementById('error').style.display = 'none';
+            document.getElementById('no-data').style.display = 'block';
+            document.getElementById('requests-container').style.display = 'none';
+        }
+
+        function showError(message) {
+            hideLoading();
+            document.getElementById('error').textContent = message;
+            document.getElementById('error').style.display = 'block';
+            document.getElementById('no-data').style.display = 'none';
+            document.getElementById('requests-container').style.display = 'none';
+        }
+
+        function updateLastUpdated() {
+            document.getElementById('last-updated').textContent = new Date().toLocaleTimeString();
+        }
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', function() {
+            stopAutoRefresh();
+        });
+    </script>
+</body>
+</html> 

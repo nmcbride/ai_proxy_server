@@ -42,7 +42,7 @@ class ResponseModifier:
         if not settings.ENABLE_RESPONSE_MODIFICATION:
             return response_data
 
-        self.logger.info("Modifying response", path=path, status_code=status_code)
+        self.logger.debug("Modifying response", path=path, status_code=status_code)
 
         # Route to specific modifier based on endpoint
         if path == "/v1/chat/completions":

@@ -166,7 +166,7 @@ class MCPServerConnection:
         try:
             result = await self.session.call_tool(tool_name, arguments)
             execution_time = time.time() - start_time
-            logger.info(
+            logger.debug(
                 "Tool called successfully", 
                 server=self.name, 
                 tool=tool_name,

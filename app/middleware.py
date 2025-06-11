@@ -44,7 +44,7 @@ class LoggingMiddleware(BaseHTTPMiddleware):
             process_time = time.perf_counter() - start_time
 
             # Log response
-            logger.info(
+            logger.debug(
                 "Request completed",
                 request_id=request_id,
                 status_code=response.status_code,
