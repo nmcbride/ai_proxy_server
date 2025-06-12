@@ -145,6 +145,7 @@
             display: flex;
             gap: 16px;
             align-items: center;
+            flex: 1;
         }
 
         .total-time {
@@ -178,6 +179,27 @@
             font-size: 14px;
             color: #6b7280;
             transition: transform 0.2s;
+        }
+
+        .spinner {
+            width: 16px;
+            height: 16px;
+            border: 2px solid #e5e7eb;
+            border-top: 2px solid #3b82f6;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 8px;
+            flex-shrink: 0;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .request-status {
+            display: flex;
+            align-items: center;
         }
 
         .request-card.expanded .expand-icon {
@@ -294,10 +316,6 @@
             margin-left: 272px;
             margin-top: -8px;
             margin-bottom: 8px;
-        }
-
-        .phase-metadata-sub {
-            margin-left: 252px;
         }
 
         .phase-group-header {
@@ -528,33 +546,53 @@
         }
 
         async function loadAndUpdateProfiles() {
-            const response = await fetch(`${BASE_URL}/profiling/active`);
+            const response = await fetch(`${BASE_URL}/profiling/active?limit=100`);
             const data = await response.json();
             
             document.getElementById('active-count').textContent = data.active_profiles;
             document.getElementById('avg-time').textContent = 
                 data.avg_request_time_ms ? data.avg_request_time_ms.toFixed(1) : '-';
 
-            // Load detailed data for new requests only
+            // Load detailed data for all requests (new and updates)
             const newRequests = [];
+            const updatedRequests = [];
+            
             for (const request of data.slowest_requests) {
-                if (!requestsData.has(request.request_id)) {
-                    try {
-                        const detailResponse = await fetch(`${BASE_URL}/profiling/export/${request.request_id}`);
-                        const detailData = await detailResponse.json();
-                        
-                        // Calculate actual request start time
-                        const now = performance.now();
-                        const requestAgeMs = detailData.export_timestamp || 0;
-                        detailData.timestamp = new Date(Date.now() - requestAgeMs); // Set to actual request start time
-                        
+                try {
+                    const detailResponse = await fetch(`${BASE_URL}/profiling/export/${request.request_id}`);
+                    const detailData = await detailResponse.json();
+                    
+                    // Use real timestamp from when request started
+                    if (detailData.summary.real_start_time) {
+                        detailData.timestamp = new Date(detailData.summary.real_start_time);
+                    } else {
+                        // Fallback for older requests without real timestamp
+                        detailData.timestamp = new Date(Date.now() - (detailData.summary.total_time_ms || 0));
+                    }
+                    
+                    if (!requestsData.has(request.request_id)) {
+                        // New request
                         requestsData.set(request.request_id, detailData);
                         newRequests.push(detailData);
-                    } catch (error) {
-                        console.warn(`Failed to load details for ${request.request_id}:`, error);
+                    } else {
+                        // Existing request - check if it has been updated
+                        const existing = requestsData.get(request.request_id);
+                        if (existing.summary.phase_count !== detailData.summary.phase_count || 
+                            existing.summary.total_time_ms !== detailData.summary.total_time_ms) {
+                            // Request has been updated with more data
+                            requestsData.set(request.request_id, detailData);
+                            updatedRequests.push(detailData);
+                        }
                     }
+                } catch (error) {
+                    console.warn(`Failed to load details for ${request.request_id}:`, error);
                 }
             }
+
+            // Update existing requests first
+            updatedRequests.forEach(request => {
+                updateExistingRequestCard(request);
+            });
 
             // Add new requests to the display
             if (newRequests.length > 0) {
@@ -576,11 +614,34 @@
             // Sort new requests by timestamp (newest first) before adding
             const sortedRequests = newRequests.sort((a, b) => b.timestamp - a.timestamp);
             
-            // Add sorted requests to the top of the list (newest first)
-            sortedRequests.forEach(request => {
-                const card = createRequestCard(request);
-                container.insertBefore(card, container.firstChild);
-            });
+            if (isFirstLoad) {
+                // On first load, add all requests in correct order
+                sortedRequests.forEach(request => {
+                    const card = createRequestCard(request);
+                    container.appendChild(card);
+                });
+            } else {
+                // On updates, add new requests to the top
+                sortedRequests.forEach(request => {
+                    const card = createRequestCard(request);
+                    container.insertBefore(card, container.firstChild);
+                });
+            }
+        }
+
+        function updateExistingRequestCard(request) {
+            const container = document.getElementById('requests-container');
+            const existingCard = container.querySelector(`[data-request-id="${request.request_id}"]`);
+            
+            if (existingCard) {
+                // Update the card with new data
+                const newCard = createRequestCard(request);
+                // Preserve expanded state
+                if (existingCard.classList.contains('expanded')) {
+                    newCard.classList.add('expanded');
+                }
+                container.replaceChild(newCard, existingCard);
+            }
         }
 
         function createRequestCard(request) {
@@ -589,6 +650,7 @@
             card.dataset.requestId = request.request_id; // Store request ID for reference
             
             const timeAgo = request.timestamp ? formatTimeAgo(request.timestamp) : 'Unknown';
+            const isInProgress = isRequestInProgress(request);
             
             card.innerHTML = `
                 <div class="request-header" onclick="toggleCard(this)">
@@ -598,16 +660,40 @@
                             <span class="total-time">${request.summary.total_time_ms.toFixed(1)}ms</span>
                             <span class="phase-count">${request.summary.phase_count} phases</span>
                             <span class="model">${request.summary.metadata?.model || 'N/A'}</span>
+                            ${isInProgress ? '<div class="spinner"></div>' : ''}
                             <span class="timestamp">${timeAgo}</span>
                         </div>
                     </div>
-                    <div class="expand-icon">▼</div>
+                    <div class="request-status">
+                        <div class="expand-icon">▼</div>
+                    </div>
                 </div>
                 <div class="request-details">
                     ${createRequestDetails(request)}
                 </div>
             `;
             return card;
+        }
+
+        function isRequestInProgress(request) {
+            const phases = request.summary.phases || [];
+            const phaseNames = phases.map(p => p.name);
+            const totalTime = request.summary.total_time_ms || 0;
+            const phaseCount = request.summary.phase_count || 0;
+            
+            // Check for completion indicators
+            const hasResponseProcessing = phaseNames.some(name => 
+                name.includes('Response') || name.includes('Final')
+            );
+            const hasProviderCommunication = phaseNames.some(name =>
+                name.includes('AI Provider') || name.includes('Tool-Calling') || name.includes('Streaming')
+            );
+            
+            // A request is in progress if it's missing key completion phases
+            // Most requests should have some form of response processing
+            return !hasResponseProcessing || 
+                   (!hasProviderCommunication && phaseCount > 3) ||
+                   (totalTime < 50 && phaseCount < 10);
         }
 
         function formatTimeAgo(timestamp) {
@@ -628,39 +714,35 @@
             // Group phases by logical workflow sections
             const phaseGroups = {
                 'Request Processing': [
-                    'Reading Request Data',
-                    'Parsing Request JSON',
-                    'Processing Request',
-                    'Running Pre-Processing Plugins',
-                    'Serializing Request JSON',
-                    'Building Upstream Request',
-                    'Converting to Non-Streaming'
+                    'Reading Request Body', 
+                    'Parsing Request JSON', 
+                    'Running Request Plugins', 
+                    'Running Request Modifiers', 
+                    'Serializing Request JSON', 
+                    'Building Upstream Request', 
+                    'Converting to Non-Streaming' 
                 ],
                 'AI Provider Communication': [
-                    'Calling AI Provider',
-                    'Streaming to AI Provider',
-                    'Initial Tool-Calling Request',
-                    'Sending Tool Results to AI'
+                    'Streaming Direct to Upstream', 
+                    'Calling Upstream', 
+                    'Calling Upstream Hybrid', 
+                    'Calling Upstream Hybrid Follow-Up' 
                 ],
                 'Tool Calling': [
-                    'Processing Tool Calls',
-                    'Parsing Tool Arguments',
-                    'Executing MCP Tool',
-                    'Formatting Tool Results',
-                    'Preparing Tool Results Request'
+                    'Parsing Tool Arguments', 
+                    'Executing Tool', 
+                    'Formatting Tool Results', 
+                    'Preparing Tool Follow-Up' 
                 ],
                 'Response Processing': [
-                    'Parsing AI Response',
-                    'Processing Response',
-                    'Running Post-Processing Plugins',
-                    'Processing Tool-Call Response',
-                    'Processing Tool Results Response',
-                    'Serializing Final Response'
-                ],
-                'Streaming': [
-                    'Processing Streaming Headers',
-                    'Extracting Streaming Content',
-                    'Creating Streaming Chunks'
+                    'Cleaning Direct Streaming Headers', 
+                    'Parsing Upstream Response', 
+                    'Serializing Response JSON', 
+                    'Running Response Plugins', 
+                    'Running Response Modifiers', 
+                    'Processing Response Hybrid', 
+                    'Extracting Streaming Content', 
+
                 ]
             };
             
@@ -690,7 +772,7 @@
             
             let phasesHtml = '';
             
-            // Process each group
+            // Process each group, but also include phases that don't match any group
             Object.entries(phaseGroups).forEach(([groupName, phaseNames]) => {
                 // Find phases that belong to this group by checking originalName
                 const groupPhases = enhancedPhases.filter(phase => 
@@ -744,18 +826,6 @@
 
             return `
                 <div class="stats-grid">
-                    <div class="stat-card">
-                        <div class="stat-value">${displayedTotalTime.toFixed(1)}</div>
-                        <div class="stat-label">Total Time (ms)</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-value">${request.summary.phase_count}</div>
-                        <div class="stat-label">Phases</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-value">${request.summary.metadata?.model || 'N/A'}</div>
-                        <div class="stat-label">Model</div>
-                    </div>
                     <div class="stat-card">
                         <div class="stat-value">${topPhases[0]?.name || 'N/A'}</div>
                         <div class="stat-label">Slowest Phase</div>

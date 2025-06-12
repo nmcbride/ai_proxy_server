@@ -30,9 +30,6 @@ http_client: Optional[httpx.AsyncClient] = None
 plugin_manager = PluginManager()
 
 
-
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan manager"""
@@ -113,9 +110,6 @@ async def get_http_client() -> httpx.AsyncClient:
     return http_client
 
 
-
-
-
 @app.api_route("/health", methods=["GET"])
 async def health_check() -> dict:
     """Health check endpoint"""
@@ -125,16 +119,28 @@ async def health_check() -> dict:
 @app.api_route("/config", methods=["GET"])
 async def get_config() -> dict:
     """Get current server configuration"""
-    return {
-        "ENABLE_HYBRID_STREAMING": settings.ENABLE_HYBRID_STREAMING,
-        "ENABLE_REQUEST_MODIFICATION": settings.ENABLE_REQUEST_MODIFICATION,
-        "ENABLE_RESPONSE_MODIFICATION": settings.ENABLE_RESPONSE_MODIFICATION,
-        "MAX_TOOL_ROUNDS": settings.MAX_TOOL_ROUNDS,
-        "TOOL_EXECUTION_TIMEOUT": settings.TOOL_EXECUTION_TIMEOUT,
-        "REQUEST_TIMEOUT": settings.REQUEST_TIMEOUT,
-        "LITELLM_BASE_URL": settings.LITELLM_BASE_URL,
-        "SYSTEM_CONTEXT": settings.SYSTEM_CONTEXT[:100] + "..." if settings.SYSTEM_CONTEXT and len(settings.SYSTEM_CONTEXT) > 100 else settings.SYSTEM_CONTEXT,
-    }
+    config = {}
+
+    # Enumerate all public attributes from settings
+    for attr_name in dir(settings):
+        # Skip private/internal attributes and methods
+        if attr_name.startswith('_') or callable(getattr(settings, attr_name)):
+            continue
+
+        try:
+            value = getattr(settings, attr_name)
+
+            # Handle long string values by truncating them
+            if isinstance(value, str) and len(value) > 100:
+                config[attr_name] = value[:100] + "..."
+            else:
+                config[attr_name] = value
+
+        except Exception:
+            # Skip any attributes that can't be accessed
+            continue
+
+    return config
 
 
 @app.api_route("/debug/mcp/status", methods=["GET"])
@@ -185,6 +191,7 @@ async def plugin_status() -> dict:
         return {"error": str(e)}
 
 
+@app.api_route("/models", methods=["GET"], response_model=None)
 @app.api_route("/v1/models", methods=["GET"], response_model=None)
 async def list_models(
     request: Request,
@@ -194,15 +201,7 @@ async def list_models(
     return await proxy_request("GET", "/v1/models", request, client)
 
 
-@app.api_route("/models", methods=["GET"], response_model=None)
-async def list_models_no_v1(
-    request: Request,
-    client: httpx.AsyncClient = Depends(get_http_client),
-) -> Union[Response, StreamingResponse]:
-    """List available models (OpenAI client compatibility)"""
-    return await proxy_request("GET", "/v1/models", request, client)
-
-
+@app.api_route("/chat/completions", methods=["POST"], response_model=None)
 @app.api_route("/v1/chat/completions", methods=["POST"], response_model=None)
 async def chat_completions(
     request: Request,
@@ -213,110 +212,6 @@ async def chat_completions(
     This is where you can add context, modify prompts, etc.
     """
     return await proxy_request("POST", "/v1/chat/completions", request, client)
-
-
-@app.api_route("/chat/completions", methods=["POST"], response_model=None)
-async def chat_completions_no_v1(
-    request: Request,
-    client: httpx.AsyncClient = Depends(get_http_client),
-) -> Union[Response, StreamingResponse]:
-    """Chat completions endpoint (OpenAI client compatibility)"""
-    return await proxy_request("POST", "/v1/chat/completions", request, client)
-
-
-@app.api_route("/v1/completions", methods=["POST"], response_model=None)
-async def completions(
-    request: Request,
-    client: httpx.AsyncClient = Depends(get_http_client),
-) -> Union[Response, StreamingResponse]:
-    """
-    Text completions endpoint with request/response modification
-    """
-    return await proxy_request("POST", "/v1/completions", request, client)
-
-
-@app.api_route("/completions", methods=["POST"], response_model=None)
-async def completions_no_v1(
-    request: Request,
-    client: httpx.AsyncClient = Depends(get_http_client),
-) -> Union[Response, StreamingResponse]:
-    """Text completions endpoint (OpenAI client compatibility)"""
-    return await proxy_request("POST", "/v1/completions", request, client)
-
-
-@app.api_route("/v1/embeddings", methods=["POST"], response_model=None)
-async def embeddings(
-    request: Request,
-    client: httpx.AsyncClient = Depends(get_http_client),
-) -> Union[Response, StreamingResponse]:
-    """
-    Embeddings endpoint with request/response modification
-    """
-    return await proxy_request("POST", "/v1/embeddings", request, client)
-
-
-@app.api_route("/embeddings", methods=["POST"], response_model=None)
-async def embeddings_no_v1(
-    request: Request,
-    client: httpx.AsyncClient = Depends(get_http_client),
-) -> Union[Response, StreamingResponse]:
-    """Embeddings endpoint (OpenAI client compatibility)"""
-    return await proxy_request("POST", "/v1/embeddings", request, client)
-
-
-@app.api_route("/v1/moderations", methods=["POST"], response_model=None)
-async def moderations(
-    request: Request,
-    client: httpx.AsyncClient = Depends(get_http_client),
-) -> Union[Response, StreamingResponse]:
-    """
-    Moderations endpoint
-    """
-    return await proxy_request("POST", "/v1/moderations", request, client)
-
-
-@app.api_route("/v1/images/generations", methods=["POST"], response_model=None)
-async def image_generations(
-    request: Request,
-    client: httpx.AsyncClient = Depends(get_http_client),
-) -> Union[Response, StreamingResponse]:
-    """
-    Image generations endpoint
-    """
-    return await proxy_request("POST", "/v1/images/generations", request, client)
-
-
-@app.api_route("/v1/audio/speech", methods=["POST"], response_model=None)
-async def audio_speech(
-    request: Request,
-    client: httpx.AsyncClient = Depends(get_http_client),
-) -> Union[Response, StreamingResponse]:
-    """
-    Audio speech endpoint
-    """
-    return await proxy_request("POST", "/v1/audio/speech", request, client)
-
-
-@app.api_route("/v1/audio/transcriptions", methods=["POST"], response_model=None)
-async def audio_transcriptions(
-    request: Request,
-    client: httpx.AsyncClient = Depends(get_http_client),
-) -> Union[Response, StreamingResponse]:
-    """
-    Audio transcriptions endpoint
-    """
-    return await proxy_request("POST", "/v1/audio/transcriptions", request, client)
-
-
-@app.api_route("/v1/audio/translations", methods=["POST"], response_model=None)
-async def audio_translations(
-    request: Request,
-    client: httpx.AsyncClient = Depends(get_http_client),
-) -> Union[Response, StreamingResponse]:
-    """
-    Audio translations endpoint
-    """
-    return await proxy_request("POST", "/v1/audio/translations", request, client)
 
 
 # Catch-all route for any other v1 endpoints
