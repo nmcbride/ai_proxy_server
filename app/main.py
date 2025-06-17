@@ -14,34 +14,50 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 
 from app.config import settings
-from app.mcp_client import mcp_manager
-from app.mcp_config import mcp_config
-from app.middleware import LoggingMiddleware, ProxyMiddleware
-from app.plugin_system import PluginManager
-from app.profiling_endpoint import profiling_router
-from app.proxy_handler import proxy_request, set_plugin_manager
 
-# Configure structured logging with file output
+# Configure logging BEFORE importing modules that create loggers
+
+# Configure unified structured logging
 def configure_logging():
-    """Configure structlog to write to both stdout and file"""
+    """Configure structlog to write to both stdout and file with unified format"""
     import sys
     from pathlib import Path
-    
+
     # Create logs directory if it doesn't exist
     logs_dir = Path("logs")
     logs_dir.mkdir(exist_ok=True)
-    
-    # Configure standard logging to write to file
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        handlers=[
-            logging.FileHandler(logs_dir / "ai_proxy_server.log"),
-            logging.StreamHandler(sys.stdout)
-        ]
-    )
-    
-    # Configure structlog
+
+    # Configure root logger with both file and console handlers
+    log_level = logging.DEBUG if settings.DEBUG else logging.INFO
+
+    # Clear any existing handlers
+    logging.getLogger().handlers.clear()
+
+    # Create handlers
+    file_handler = logging.FileHandler(logs_dir / "ai_proxy_server.log")
+    console_handler = logging.StreamHandler(sys.stdout)
+
+    # Set up basic formatting for stdlib loggers (httpx, uvicorn, etc.)
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    file_handler.setFormatter(formatter)
+    console_handler.setFormatter(formatter)
+
+    # Configure root logger
+    root_logger = logging.getLogger()
+    root_logger.setLevel(log_level)
+    root_logger.addHandler(file_handler)
+    root_logger.addHandler(console_handler)
+
+    # Configure structlog - simpler approach with conditional formatting
+    # We'll use colored console for development, JSON for file-friendly parsing
+
+    if settings.DEBUG:
+        # Development: Beautiful colored console (same for console and file)
+        final_processor = structlog.dev.ConsoleRenderer(colors=True)
+    else:
+        # Production: JSON format (better for log analysis tools)
+        final_processor = structlog.processors.JSONRenderer()
+
     structlog.configure(
         processors=[
             structlog.stdlib.filter_by_level,
@@ -52,7 +68,7 @@ def configure_logging():
             structlog.processors.StackInfoRenderer(),
             structlog.processors.format_exc_info,
             structlog.processors.UnicodeDecoder(),
-            structlog.processors.JSONRenderer()
+            final_processor
         ],
         context_class=dict,
         logger_factory=structlog.stdlib.LoggerFactory(),
@@ -62,6 +78,14 @@ def configure_logging():
 
 # Configure logging on import
 configure_logging()
+
+# Now import modules that create loggers (after logging is configured)
+from app.mcp_client import mcp_manager
+from app.mcp_config import mcp_config
+from app.middleware import LoggingMiddleware, ProxyMiddleware
+from app.plugin_system import PluginManager
+from app.profiling_endpoint import profiling_router
+from app.proxy_handler import proxy_request, set_plugin_manager
 
 # Suppress watchfiles.main INFO logging only in DEBUG mode to prevent "1 change detected" spam
 if settings.DEBUG:

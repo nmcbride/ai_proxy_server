@@ -93,6 +93,14 @@ async def handle_tool_calls(
                         arguments=list(arguments.keys()),
                     )
 
+                    # Debug: Log full tool arguments
+                    logger.debug(
+                        "Tool arguments (full)",
+                        proxy_request_id=proxy_request_id,
+                        tool=function_name,
+                        arguments=arguments
+                    )
+
                     # Call the MCP tool with timeout
                     async with profiler.time_phase("Executing Tool", tool=function_name, round=tool_round) if profiler else None:
                         result = await asyncio.wait_for(
@@ -125,14 +133,12 @@ async def handle_tool_calls(
                             }
                         )
 
-                    # Debug: Log the actual content being sent to LLM
+                    # Debug: Log full tool output
                     logger.debug(
-                        "Tool result content preview",
+                        "Tool output (full)",
                         proxy_request_id=proxy_request_id,
                         tool=function_name,
-                        content_length=len(result_text),
-                        has_newlines="\n" in result_text,
-                        first_100_chars=result_text[:100].replace('\n', '\\n'),
+                        output=result_text
                     )
 
                     logger.debug(
