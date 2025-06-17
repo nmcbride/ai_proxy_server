@@ -13,11 +13,12 @@ import os
 import sys
 from typing import Any, Dict, List
 
+import structlog
 import yaml
 
 from .registry import get_all_plugins, get_plugins, list_plugin_names
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger()
 
 
 class PluginManager:
@@ -66,18 +67,32 @@ class PluginManager:
 
         counts["total"] = system_count + user_count
 
-        # Log summary
+        # Log summary with detailed plugin information
         registry_counts = list_plugin_names()
+        all_plugins = get_all_plugins()
+        
         logger.info("Plugin loading complete:")
         logger.info(f"  System plugins loaded: {system_count}")
         logger.info(f"  User plugins loaded: {user_count}")
         logger.info(f"  Total files loaded: {counts['total']}")
-        logger.info(
-            f"  Registered before_request plugins: {len(registry_counts.get('before_request', []))}"
-        )
-        logger.info(
-            f"  Registered after_request plugins: {len(registry_counts.get('after_request', []))}"
-        )
+        
+        # Log detailed information for each registered plugin
+        for hook in ["before_request", "after_request"]:
+            plugins = all_plugins.get(hook, [])
+            if plugins:
+                logger.info(f"  Registered {hook} plugins: {len(plugins)}")
+                for plugin in plugins:
+                    endpoints_str = ", ".join(plugin["endpoints"]) if plugin["endpoints"] else "none"
+                    config_available = plugin["name"] in self.plugin_configs
+                    enabled = self._get_plugin_config(plugin["name"]).get("enabled", True) is not False
+                    logger.info(
+                        f"    - {plugin['name']}: priority={plugin['priority']}, "
+                        f"endpoints=[{endpoints_str}], version={plugin['version']}, "
+                        f"config={'yes' if config_available else 'no'}, "
+                        f"enabled={'yes' if enabled else 'no'}"
+                    )
+            else:
+                logger.info(f"  Registered {hook} plugins: 0")
 
         return counts
 

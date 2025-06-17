@@ -3,6 +3,7 @@ FastAPI Proxy Server for OpenAI v1 API Endpoints with LiteLLM Upstream
 """
 
 import time
+import logging
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator, Optional, Union
 
@@ -20,7 +21,47 @@ from app.plugin_system import PluginManager
 from app.profiling_endpoint import profiling_router
 from app.proxy_handler import proxy_request, set_plugin_manager
 
-# Configure structured logging
+# Configure structured logging with file output
+def configure_logging():
+    """Configure structlog to write to both stdout and file"""
+    import sys
+    from pathlib import Path
+    
+    # Create logs directory if it doesn't exist
+    logs_dir = Path("logs")
+    logs_dir.mkdir(exist_ok=True)
+    
+    # Configure standard logging to write to file
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.FileHandler(logs_dir / "ai_proxy_server.log"),
+            logging.StreamHandler(sys.stdout)
+        ]
+    )
+    
+    # Configure structlog
+    structlog.configure(
+        processors=[
+            structlog.stdlib.filter_by_level,
+            structlog.stdlib.add_logger_name,
+            structlog.stdlib.add_log_level,
+            structlog.stdlib.PositionalArgumentsFormatter(),
+            structlog.processors.TimeStamper(fmt="iso"),
+            structlog.processors.StackInfoRenderer(),
+            structlog.processors.format_exc_info,
+            structlog.processors.UnicodeDecoder(),
+            structlog.processors.JSONRenderer()
+        ],
+        context_class=dict,
+        logger_factory=structlog.stdlib.LoggerFactory(),
+        wrapper_class=structlog.stdlib.BoundLogger,
+        cache_logger_on_first_use=True,
+    )
+
+# Configure logging on import
+configure_logging()
 logger = structlog.get_logger()
 
 # Global HTTP client for upstream requests
@@ -119,28 +160,20 @@ async def health_check() -> dict:
 @app.api_route("/config", methods=["GET"])
 async def get_config() -> dict:
     """Get current server configuration"""
-    config = {}
-
-    # Enumerate all public attributes from settings
-    for attr_name in dir(settings):
-        # Skip private/internal attributes and methods
-        if attr_name.startswith('_') or callable(getattr(settings, attr_name)):
-            continue
-
-        try:
-            value = getattr(settings, attr_name)
-
-            # Handle long string values by truncating them
+    try:
+        # Use Pydantic's model_dump() to properly serialize the settings
+        config = settings.model_dump()
+        
+        # Handle long string values by truncating them
+        for key, value in config.items():
             if isinstance(value, str) and len(value) > 100:
-                config[attr_name] = value[:100] + "..."
-            else:
-                config[attr_name] = value
-
-        except Exception:
-            # Skip any attributes that can't be accessed
-            continue
-
-    return config
+                config[key] = value[:100] + "..."
+        
+        return config
+    except Exception as e:
+        logger.error("Error getting configuration", error=str(e))
+        return {"error": f"Failed to get configuration: {str(e)}"}
+    
 
 
 @app.api_route("/debug/mcp/status", methods=["GET"])

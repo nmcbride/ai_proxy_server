@@ -1,10 +1,10 @@
 mcp_servers:
   # Debug server for testing tool calls
-  python_debug:
-    transport: stdio
-    command: uv
-    args: ["run", "python", "mcp_servers/debug_server.py"]
-    description: "Debug tools for testing MCP integration"
+  # python_debug:
+  #   transport: stdio
+  #   command: uv
+  #   args: ["run", "python", "mcp_servers/debug_server.py"]
+  #   description: "Debug tools for testing MCP integration"
   
   # Proxy status server for monitoring the AI proxy
   python_proxy_status:
@@ -13,6 +13,17 @@ mcp_servers:
     args: ["run", "python", "mcp_servers/get_proxy_status.py"]
     description: "Get comprehensive status information about the AI Proxy Server"
   
+# Brave Search MCP server for web search capabilities
+  brave_search:
+    transport: stdio
+    command: npx
+    args: 
+      - "-y"
+      - "@modelcontextprotocol/server-brave-search"
+    env:
+      BRAVE_API_KEY: "BSAlO8nx9QkBoCydxBr1gpnMC1RWvTu"
+    description: "Brave Search API integration for web search capabilities"
+
   # Node.js filesystem MCP server with restrictions
   # nodejs_filesystem:
   #   transport: stdio

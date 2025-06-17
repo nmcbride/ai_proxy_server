@@ -47,13 +47,6 @@ class Settings(BaseSettings):
         default=True, validation_alias="ENABLE_RESPONSE_MODIFICATION"
     )
 
-    # Context injection settings
-    SYSTEM_CONTEXT: str = Field(
-        default="",
-        validation_alias="SYSTEM_CONTEXT",
-        description="Additional system context to inject into chat completions",
-    )
-
     # Tool calling configuration
     MAX_TOOL_ROUNDS: int = Field(
         default=5,
