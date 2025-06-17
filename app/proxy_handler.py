@@ -355,7 +355,7 @@ async def handle_hybrid_streaming_request(
     # Step 1: Create non-streaming version of request for tool calling
     async with profiler.time_phase("Converting to Non-Streaming") if profiler else None:
         logger.debug(
-            "Applying request modifications for hybrid streaming request",
+            "Converting streaming request to non-streaming for tool calling",
             proxy_request_id=proxy_request_id,
         )
 
@@ -367,19 +367,7 @@ async def handle_hybrid_streaming_request(
         non_streaming_request = request_data.copy()
         non_streaming_request["stream"] = False
 
-        # Add MCP tools and apply plugins to the non-streaming request for tool calling
-
-        # Apply plugin system
-        if plugin_manager:
-            context = {"endpoint": path}
-            non_streaming_request = plugin_manager.execute_before_request_plugins(
-                non_streaming_request, context
-            )
-
-        # Apply core MCP functionality
-        non_streaming_request = await request_modifier.modify_request(
-            path, non_streaming_request, request, is_streaming=False
-        )
+        # plugins and tools do not need to run here as they were already ran before entering this function
 
         # Prepare non-streaming request body
         non_streaming_body = json.dumps(non_streaming_request).encode()
@@ -427,30 +415,17 @@ async def handle_hybrid_streaming_request(
                     non_streaming_headers,
                     proxy_request_id,
                 )
-            elif modify_response:
-                # No tool calls, apply regular response modification
-                # Apply plugin system
-                if plugin_manager:
-                    context = {"endpoint": path}
-                    response_data = plugin_manager.execute_after_request_plugins(
-                        response_data, context
-                    )
-                # Apply core response modification
-                response_data = await response_modifier.modify_response(
-                    path, response_data, request, upstream_response.status_code
-                )
-        elif modify_response:
-            # Not a chat completion, apply regular response modification
-            # Apply plugin system
-            if plugin_manager:
-                context = {"endpoint": path}
-                response_data = plugin_manager.execute_after_request_plugins(
-                    response_data, context
-                )
-            # Apply core response modification
-            response_data = await response_modifier.modify_response(
-                path, response_data, request, upstream_response.status_code
+
+        # Apply plugin system
+        if plugin_manager:
+            context = {"endpoint": path}
+            response_data = plugin_manager.execute_after_request_plugins(
+                response_data, context
             )
+        # Apply core response modification
+        response_data = await response_modifier.modify_response(
+            path, response_data, request, upstream_response.status_code
+        )
 
     # Step 3: Convert final response to streaming format
     logger.debug(
@@ -474,6 +449,7 @@ async def handle_hybrid_streaming_request(
     # Create streaming response chunks
     async def generate_streaming_chunks():
         """Generate OpenAI-compatible streaming chunks from final content"""
+        import asyncio
         import time
 
         chunk_start_time = time.perf_counter()
@@ -496,8 +472,12 @@ async def handle_hybrid_streaming_request(
         yield f"data: {json.dumps(chunk_data)}\n\n"
         total_chunks += 1
 
+        # Add delay if configured
+        if settings.HYBRID_STREAMING_DELAY > 0:
+            await asyncio.sleep(settings.HYBRID_STREAMING_DELAY)
+
         # Stream content in character chunks (preserves all formatting)
-        chunk_size = 30  # Characters per chunk for natural streaming feel
+        chunk_size = settings.HYBRID_STREAMING_CHUNK_SIZE
 
         for i in range(0, len(final_content), chunk_size):
             chunk_text = final_content[i:i + chunk_size]
@@ -518,6 +498,10 @@ async def handle_hybrid_streaming_request(
             yield f"data: {json.dumps(chunk_data)}\n\n"
             total_chunks += 1
 
+            # Add delay between content chunks if configured
+            if settings.HYBRID_STREAMING_DELAY > 0:
+                await asyncio.sleep(settings.HYBRID_STREAMING_DELAY)
+
         # Send final chunk with finish_reason
         final_chunk_data = {
             "id": response_data.get("id", ""),
@@ -532,6 +516,10 @@ async def handle_hybrid_streaming_request(
                 }
             ],
         }
+        # Add usage data if available
+        if "usage" in response_data:
+            final_chunk_data["usage"] = response_data["usage"]
+
         yield f"data: {json.dumps(final_chunk_data)}\n\n"
         total_chunks += 1
 

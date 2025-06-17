@@ -68,6 +68,18 @@ class Settings(BaseSettings):
         validation_alias="HYBRID_STREAMING_DELAY",
         description="Delay between chunks in hybrid streaming mode (seconds, 0 for no delay)"
     )
+    HYBRID_STREAMING_CHUNK_SIZE: int = Field(
+        default=30,
+        validation_alias="HYBRID_STREAMING_CHUNK_SIZE",
+        description="Number of characters per chunk in hybrid streaming mode"
+    )
+
+    # Tool priority configuration
+    TOOL_PRIORITY: str = Field(
+        default="proxy",
+        validation_alias="TOOL_PRIORITY",
+        description="Tool priority: 'proxy' (proxy tools only) or 'client' (client tools take priority, proxy tools as fallback)"
+    )
 
     class Config:
         # Find .env file relative to project root (one level up from app/)
@@ -79,4 +91,4 @@ class Settings(BaseSettings):
 
 
 # Global settings instance
-settings = Settings() 
+settings = Settings()

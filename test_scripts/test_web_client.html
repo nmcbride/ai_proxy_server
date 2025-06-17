@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Proxy - Web Client Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .container {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        textarea {
+            width: 100%;
+            height: 100px;
+            margin: 10px 0;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-family: inherit;
+            resize: vertical;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        button:hover { background: #0056b3; }
+        button:disabled { background: #6c757d; cursor: not-allowed; }
+        .output {
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 15px;
+            min-height: 200px;
+            white-space: pre-wrap;
+            font-family: 'Monaco', 'Menlo', monospace;
+            margin-top: 10px;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .status.success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .status.error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .status.info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+    </style>
+</head>
+<body>
+    <h1>🤖 AI Proxy Server - Web Client Test</h1>
+    
+    <div class="container">
+        <h3>Configuration</h3>
+        <label>
+            Proxy URL:
+            <input type="text" id="proxyUrl" value="http://localhost:8001" style="width: 300px; margin-left: 10px;">
+        </label>
+    </div>
+
+    <div class="container">
+        <h3>Test Message</h3>
+        <textarea id="messageInput" placeholder="Enter your test message...">Hello! Please count from 1 to 5 and explain each number.</textarea>
+        
+        <div>
+            <button onclick="testStreaming()">🌊 Test Streaming</button>
+            <button onclick="testNonStreaming()">📄 Test Non-Streaming</button>
+            <button onclick="clearOutput()">🗑️ Clear Output</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <h3>Results</h3>
+        <div id="status"></div>
+        <div id="output" class="output"></div>
+    </div>
+
+    <script>
+        let isStreaming = false;
+
+        function setStatus(message, type = 'info') {
+            const statusDiv = document.getElementById('status');
+            statusDiv.textContent = message;
+            statusDiv.className = `status ${type}`;
+        }
+
+        function appendOutput(text) {
+            const output = document.getElementById('output');
+            output.textContent += text;
+            output.scrollTop = output.scrollHeight;
+        }
+
+        function clearOutput() {
+            document.getElementById('output').textContent = '';
+            document.getElementById('status').textContent = '';
+        }
+
+        async function testStreaming() {
+            if (isStreaming) return;
+            isStreaming = true;
+
+            const proxyUrl = document.getElementById('proxyUrl').value;
+            const message = document.getElementById('messageInput').value;
+            
+            clearOutput();
+            setStatus('Starting streaming test...', 'info');
+            
+            const payload = {
+                model: 'gpt-4-turbo',
+                messages: [{ role: 'user', content: message }],
+                stream: true,
+                max_tokens: 200
+            };
+
+            try {
+                const startTime = Date.now();
+                appendOutput('🌊 STREAMING TEST\n');
+                appendOutput('================\n\n');
+                
+                const response = await fetch(`${proxyUrl}/v1/chat/completions`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                setStatus('Receiving streaming response...', 'info');
+                
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let chunkCount = 0;
+                let firstChunkTime = null;
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    const chunk = decoder.decode(value);
+                    const lines = chunk.split('\n');
+
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            const data = line.slice(6);
+                            if (data.trim() === '[DONE]') {
+                                const totalTime = Date.now() - startTime;
+                                appendOutput(`\n\n📊 STREAMING STATS:\n`);
+                                appendOutput(`   Total time: ${totalTime}ms\n`);
+                                appendOutput(`   First chunk: ${firstChunkTime}ms\n`);
+                                appendOutput(`   Total chunks: ${chunkCount}\n`);
+                                setStatus('✅ Streaming test completed successfully!', 'success');
+                                return;
+                            }
+
+                            try {
+                                const parsed = JSON.parse(data);
+                                chunkCount++;
+                                
+                                if (firstChunkTime === null) {
+                                    firstChunkTime = Date.now() - startTime;
+                                }
+
+                                const choices = parsed.choices || [];
+                                if (choices.length > 0) {
+                                    const delta = choices[0].delta || {};
+                                    if (delta.content) {
+                                        appendOutput(delta.content);
+                                    }
+                                }
+                            } catch (e) {
+                                // Ignore JSON parse errors for chunks
+                            }
+                        }
+                    }
+                }
+            } catch (error) {
+                setStatus(`❌ Streaming test failed: ${error.message}`, 'error');
+                appendOutput(`\nERROR: ${error.message}\n`);
+            } finally {
+                isStreaming = false;
+            }
+        }
+
+        async function testNonStreaming() {
+            const proxyUrl = document.getElementById('proxyUrl').value;
+            const message = document.getElementById('messageInput').value;
+            
+            clearOutput();
+            setStatus('Starting non-streaming test...', 'info');
+            
+            const payload = {
+                model: 'gpt-4-turbo',
+                messages: [{ role: 'user', content: message }],
+                stream: false,
+                max_tokens: 200
+            };
+
+            try {
+                const startTime = Date.now();
+                appendOutput('📄 NON-STREAMING TEST\n');
+                appendOutput('===================\n\n');
+                
+                const response = await fetch(`${proxyUrl}/v1/chat/completions`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                const duration = Date.now() - startTime;
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                const content = data.choices?.[0]?.message?.content || 'No content received';
+                
+                appendOutput(content);
+                appendOutput(`\n\n📊 NON-STREAMING STATS:\n`);
+                appendOutput(`   Total time: ${duration}ms\n`);
+                appendOutput(`   Usage: ${JSON.stringify(data.usage || {}, null, 2)}\n`);
+                
+                setStatus('✅ Non-streaming test completed successfully!', 'success');
+                
+            } catch (error) {
+                setStatus(`❌ Non-streaming test failed: ${error.message}`, 'error');
+                appendOutput(`\nERROR: ${error.message}\n`);
+            }
+        }
+
+        // Test connection on page load
+        window.addEventListener('load', async () => {
+            const proxyUrl = document.getElementById('proxyUrl').value;
+            try {
+                const response = await fetch(`${proxyUrl}/health`);
+                if (response.ok) {
+                    setStatus('✅ Proxy server is reachable', 'success');
+                } else {
+                    setStatus('⚠️ Proxy server returned non-200 status', 'error');
+                }
+            } catch (error) {
+                setStatus('❌ Cannot reach proxy server. Make sure it\'s running on the specified URL.', 'error');
+            }
+        });
+    </script>
+</body>
+</html> 

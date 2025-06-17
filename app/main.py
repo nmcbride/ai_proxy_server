@@ -62,6 +62,12 @@ def configure_logging():
 
 # Configure logging on import
 configure_logging()
+
+# Suppress watchfiles.main INFO logging only in DEBUG mode to prevent "1 change detected" spam
+if settings.DEBUG:
+    watchfiles_logger = logging.getLogger('watchfiles.main')
+    watchfiles_logger.setLevel(logging.WARNING)
+
 logger = structlog.get_logger()
 
 # Global HTTP client for upstream requests
@@ -163,17 +169,17 @@ async def get_config() -> dict:
     try:
         # Use Pydantic's model_dump() to properly serialize the settings
         config = settings.model_dump()
-        
+
         # Handle long string values by truncating them
         for key, value in config.items():
             if isinstance(value, str) and len(value) > 100:
                 config[key] = value[:100] + "..."
-        
+
         return config
     except Exception as e:
         logger.error("Error getting configuration", error=str(e))
         return {"error": f"Failed to get configuration: {str(e)}"}
-    
+
 
 
 @app.api_route("/debug/mcp/status", methods=["GET"])
@@ -319,5 +325,6 @@ if __name__ == "__main__":
         host=settings.HOST,
         port=settings.PORT,
         reload=settings.DEBUG,
+        reload_excludes=["logs/", "logs/*", "*.log", "logs/*.log", "__pycache__/", "*.pyc"],
         log_level="info" if not settings.DEBUG else "debug",
     )

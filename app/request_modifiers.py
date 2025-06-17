@@ -54,18 +54,18 @@ class RequestModifier:
         Modify chat completion requests
         Example: Add system context, modify user messages, etc.
         """
-        # Add system context if configured
-        if settings.SYSTEM_CONTEXT and "messages" in request_data:
-            messages = request_data["messages"]
+        # # Add system context if configured
+        # if settings.SYSTEM_CONTEXT and "messages" in request_data:
+        #     messages = request_data["messages"]
 
-            # Check if there's already a system message
-            has_system_message = any(msg.get("role") == "system" for msg in messages)
+        #     # Check if there's already a system message
+        #     has_system_message = any(msg.get("role") == "system" for msg in messages)
 
-            if not has_system_message:
-                # Add system context at the beginning
-                system_message = {"role": "system", "content": settings.SYSTEM_CONTEXT}
-                request_data["messages"] = [system_message] + messages
-                self.logger.info("Added system context to chat completion")
+        #     if not has_system_message:
+        #         # Add system context at the beginning
+        #         system_message = {"role": "system", "content": settings.SYSTEM_CONTEXT}
+        #         request_data["messages"] = [system_message] + messages
+        #         self.logger.info("Added system context to chat completion")
 
         # Add MCP tools if available
         # Tools work for:
@@ -100,16 +100,41 @@ class RequestModifier:
             mcp_tools = mcp_manager.format_tools_for_ai()
 
             if mcp_tools:
-                # Add tools to request
-                request_data["tools"] = request_data.get("tools", []) + mcp_tools
+                # Handle tool priority based on configuration
+                existing_tools = request_data.get("tools", [])
+                
+                if settings.TOOL_PRIORITY == "client":
+                    # Only add MCP tools if client didn't send any
+                    if not existing_tools:
+                        request_data["tools"] = mcp_tools
+                        self.logger.debug(
+                            "Added MCP tools to request (client had no tools)", 
+                            tool_count=len(mcp_tools)
+                        )
+                    else:
+                        self.logger.debug(
+                            "Skipping MCP tools (client tools take priority)", 
+                            client_tool_count=len(existing_tools)
+                        )
+                else:  # "proxy" priority (default)
+                    # Proxy tools replace any client tools
+                    request_data["tools"] = mcp_tools
+                    if existing_tools:
+                        self.logger.debug(
+                            "Replaced client tools with MCP tools", 
+                            client_tool_count=len(existing_tools),
+                            mcp_tool_count=len(mcp_tools)
+                        )
+                    else:
+                        self.logger.debug(
+                            "Added MCP tools to request", 
+                            tool_count=len(mcp_tools)
+                        )
 
-                # Ensure tool_choice allows auto selection
-                if "tool_choice" not in request_data:
-                    request_data["tool_choice"] = "auto"
-
-                self.logger.debug(
-                    "Added MCP tools to request", tool_count=len(mcp_tools)
-                )
+                # Ensure tool_choice allows auto selection (only if we added tools)
+                if "tools" in request_data and request_data["tools"]:
+                    if "tool_choice" not in request_data:
+                        request_data["tool_choice"] = "auto"
 
                 # Add information about available tools to system message
                 tool_descriptions = []
